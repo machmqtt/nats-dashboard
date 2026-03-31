@@ -53,9 +53,9 @@ type JetStreamConfig struct {
 }
 
 type JetStreamStats struct {
-	Memory   uint64           `json:"memory"`
-	Store    uint64           `json:"storage"`
-	Accounts int              `json:"accounts"`
+	Memory   uint64            `json:"memory"`
+	Store    uint64            `json:"storage"`
+	Accounts int               `json:"accounts"`
 	API      JetStreamAPIStats `json:"api"`
 }
 
@@ -75,28 +75,28 @@ type Connz struct {
 }
 
 type ConnInfo struct {
-	Cid            uint64    `json:"cid"`
-	Kind           string    `json:"kind,omitempty"`
-	IP             string    `json:"ip"`
-	Port           int       `json:"port"`
-	Start          time.Time `json:"start"`
-	LastActivity   time.Time `json:"last_activity"`
-	RTT            string    `json:"rtt,omitempty"`
-	Uptime         string    `json:"uptime"`
-	Idle           string    `json:"idle"`
-	Pending        int       `json:"pending_bytes"`
-	InMsgs         int64     `json:"in_msgs"`
-	OutMsgs        int64     `json:"out_msgs"`
-	InBytes        int64     `json:"in_bytes"`
-	OutBytes       int64     `json:"out_bytes"`
-	NumSubs        uint32    `json:"subscriptions"`
-	Name           string    `json:"name,omitempty"`
-	Lang           string    `json:"lang,omitempty"`
-	Version        string    `json:"version,omitempty"`
-	TLSVersion     string    `json:"tls_version,omitempty"`
-	TLSCipher      string    `json:"tls_cipher_suite,omitempty"`
-	AuthorizedUser string    `json:"authorized_user,omitempty"`
-	Account        string    `json:"account,omitempty"`
+	Cid            uint64      `json:"cid"`
+	Kind           string      `json:"kind,omitempty"`
+	IP             string      `json:"ip"`
+	Port           int         `json:"port"`
+	Start          time.Time   `json:"start"`
+	LastActivity   time.Time   `json:"last_activity"`
+	RTT            string      `json:"rtt,omitempty"`
+	Uptime         string      `json:"uptime"`
+	Idle           string      `json:"idle"`
+	Pending        int         `json:"pending_bytes"`
+	InMsgs         int64       `json:"in_msgs"`
+	OutMsgs        int64       `json:"out_msgs"`
+	InBytes        int64       `json:"in_bytes"`
+	OutBytes       int64       `json:"out_bytes"`
+	NumSubs        uint32      `json:"subscriptions"`
+	Name           string      `json:"name,omitempty"`
+	Lang           string      `json:"lang,omitempty"`
+	Version        string      `json:"version,omitempty"`
+	TLSVersion     string      `json:"tls_version,omitempty"`
+	TLSCipher      string      `json:"tls_cipher_suite,omitempty"`
+	AuthorizedUser string      `json:"authorized_user,omitempty"`
+	Account        string      `json:"account,omitempty"`
 	Subs           []string    `json:"subscriptions_list,omitempty"`
 	SubsDetail     []SubDetail `json:"subscriptions_list_detail,omitempty"`
 	MQTTClient     string      `json:"mqtt_client,omitempty"`
@@ -114,10 +114,10 @@ type SubDetail struct {
 
 // Routez mirrors NATS /routez response.
 type Routez struct {
-	ServerID  string      `json:"server_id"`
-	ServerName string     `json:"server_name"`
-	NumRoutes int         `json:"num_routes"`
-	Routes    []RouteInfo `json:"routes"`
+	ServerID   string      `json:"server_id"`
+	ServerName string      `json:"server_name"`
+	NumRoutes  int         `json:"num_routes"`
+	Routes     []RouteInfo `json:"routes"`
 }
 
 type RouteInfo struct {
@@ -177,41 +177,41 @@ type LeafInfo struct {
 
 // SubszResp mirrors NATS /subsz response.
 type SubszResp struct {
-	ServerID  string `json:"server_id"`
-	NumSubs   uint32 `json:"num_subscriptions"`
-	NumCache  uint32 `json:"num_cache"`
-	NumInsert uint64 `json:"num_inserts"`
-	NumRemove uint64 `json:"num_removes"`
-	NumMatch  uint64 `json:"num_matching"`
-	CacheHit  uint64 `json:"cache_hit_rate"`
-	MaxFanout uint32 `json:"max_fanout"`
+	ServerID  string  `json:"server_id"`
+	NumSubs   uint32  `json:"num_subscriptions"`
+	NumCache  uint32  `json:"num_cache"`
+	NumInsert uint64  `json:"num_inserts"`
+	NumRemove uint64  `json:"num_removes"`
+	NumMatch  uint64  `json:"num_matching"`
+	CacheHit  uint64  `json:"cache_hit_rate"`
+	MaxFanout uint32  `json:"max_fanout"`
 	AvgFanout float64 `json:"avg_fanout"`
 }
 
 // JSInfo mirrors NATS /jsz response.
 type JSInfo struct {
-	ServerID        string            `json:"server_id"`
-	Disabled        bool              `json:"disabled,omitempty"`
-	Config          JetStreamConfig   `json:"config,omitempty"`
-	Memory          uint64            `json:"memory"`
-	Store           uint64            `json:"storage"`
-	ReservedMemory  uint64            `json:"reserved_memory"`
-	ReservedStore   uint64            `json:"reserved_storage"`
-	Accounts        int               `json:"accounts"`
-	API             JetStreamAPIStats `json:"api"`
-	Streams         int               `json:"streams"`
-	Consumers       int               `json:"consumers"`
-	Messages        uint64            `json:"messages"`
-	Bytes           uint64            `json:"bytes"`
-	Meta            *MetaClusterInfo  `json:"meta_cluster,omitempty"`
-	AccountDetails  []AccountDetail   `json:"account_details,omitempty"`
+	ServerID       string            `json:"server_id"`
+	Disabled       bool              `json:"disabled,omitempty"`
+	Config         JetStreamConfig   `json:"config,omitempty"`
+	Memory         uint64            `json:"memory"`
+	Store          uint64            `json:"storage"`
+	ReservedMemory uint64            `json:"reserved_memory"`
+	ReservedStore  uint64            `json:"reserved_storage"`
+	Accounts       int               `json:"accounts"`
+	API            JetStreamAPIStats `json:"api"`
+	Streams        int               `json:"streams"`
+	Consumers      int               `json:"consumers"`
+	Messages       uint64            `json:"messages"`
+	Bytes          uint64            `json:"bytes"`
+	Meta           *MetaClusterInfo  `json:"meta_cluster,omitempty"`
+	AccountDetails []AccountDetail   `json:"account_details,omitempty"`
 }
 
 type MetaClusterInfo struct {
-	Name     string      `json:"name,omitempty"`
-	Leader   string      `json:"leader,omitempty"`
-	Replicas []PeerInfo  `json:"replicas,omitempty"`
-	Size     int         `json:"cluster_size"`
+	Name     string     `json:"name,omitempty"`
+	Leader   string     `json:"leader,omitempty"`
+	Replicas []PeerInfo `json:"replicas,omitempty"`
+	Size     int        `json:"cluster_size"`
 }
 
 type PeerInfo struct {
@@ -240,15 +240,15 @@ type StreamDetail struct {
 }
 
 type StreamConfig struct {
-	Name       string        `json:"name"`
-	Subjects   []string      `json:"subjects,omitempty"`
-	Retention  string        `json:"retention"`
-	MaxMsgs    int64         `json:"max_msgs"`
-	MaxBytes   int64         `json:"max_bytes"`
-	MaxAge     time.Duration `json:"max_age"`
-	Storage    string        `json:"storage"`
-	Replicas   int           `json:"num_replicas"`
-	Discard    string        `json:"discard"`
+	Name      string        `json:"name"`
+	Subjects  []string      `json:"subjects,omitempty"`
+	Retention string        `json:"retention"`
+	MaxMsgs   int64         `json:"max_msgs"`
+	MaxBytes  int64         `json:"max_bytes"`
+	MaxAge    time.Duration `json:"max_age"`
+	Storage   string        `json:"storage"`
+	Replicas  int           `json:"num_replicas"`
+	Discard   string        `json:"discard"`
 }
 
 type StreamState struct {
@@ -268,17 +268,17 @@ type ClusterInfo struct {
 }
 
 type ConsumerInfo struct {
-	StreamName    string         `json:"stream_name"`
-	Name          string         `json:"name"`
-	Created       time.Time      `json:"created"`
-	Config        ConsumerConfig `json:"config"`
-	Delivered     SequenceInfo   `json:"delivered"`
-	AckFloor     SequenceInfo   `json:"ack_floor"`
-	NumAckPending int            `json:"num_ack_pending"`
-	NumRedelivered int           `json:"num_redelivered"`
-	NumWaiting    int            `json:"num_waiting"`
-	NumPending    uint64         `json:"num_pending"`
-	Cluster       *ClusterInfo   `json:"cluster,omitempty"`
+	StreamName     string         `json:"stream_name"`
+	Name           string         `json:"name"`
+	Created        time.Time      `json:"created"`
+	Config         ConsumerConfig `json:"config"`
+	Delivered      SequenceInfo   `json:"delivered"`
+	AckFloor       SequenceInfo   `json:"ack_floor"`
+	NumAckPending  int            `json:"num_ack_pending"`
+	NumRedelivered int            `json:"num_redelivered"`
+	NumWaiting     int            `json:"num_waiting"`
+	NumPending     uint64         `json:"num_pending"`
+	Cluster        *ClusterInfo   `json:"cluster,omitempty"`
 }
 
 type ConsumerConfig struct {
@@ -298,7 +298,7 @@ type SequenceInfo struct {
 // Accountz mirrors NATS /accountz response.
 type Accountz struct {
 	ServerID      string       `json:"server_id"`
-	SystemAccount string      `json:"system_account,omitempty"`
+	SystemAccount string       `json:"system_account,omitempty"`
 	Accounts      []string     `json:"accounts,omitempty"`
 	Account       *AccountInfo `json:"account_detail,omitempty"`
 }

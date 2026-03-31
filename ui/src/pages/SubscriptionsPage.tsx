@@ -11,7 +11,7 @@ import {
 } from '@tanstack/react-table'
 import { ColumnFilter } from '../components/ColumnFilter'
 import { useStore } from '../store/store'
-import { TableSkeleton, CardSkeleton } from '../components/Skeleton'
+import { TableSkeleton } from '../components/Skeleton'
 import { ArrowUpDown, ArrowUp, ArrowDown, RefreshCw, Search, X } from 'lucide-react'
 
 // --- Types ---
@@ -134,6 +134,7 @@ export function SubscriptionsPage() {
       clearTimeout(timeoutId)
       if (res.ok) setDetail(await res.json())
       else if (!detail) addToast('Failed to fetch subscription detail', 'error')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (e: any) {
       if (e?.name !== 'AbortError' && !detail) addToast('Network error', 'error')
     } finally {
@@ -412,8 +413,3 @@ function SC({ label, value, sub }: { label: string; value: string; sub?: string 
   )
 }
 
-function fmtNum(n: number): string {
-  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'
-  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'
-  return n.toLocaleString()
-}

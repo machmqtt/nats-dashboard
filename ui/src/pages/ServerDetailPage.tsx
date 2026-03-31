@@ -41,11 +41,15 @@ export function ServerDetailPage() {
 
   useEffect(() => {
     if (!activeEnv) return
-    setLoading(true)
-    fetch(`/api/environments/${activeEnv}/varz`)
-      .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
+    const run = async () => {
+      setLoading(true)
+      try {
+        const r = await fetch(`/api/environments/${activeEnv}/varz`)
+        setData(await r.json())
+      } catch { /* */ }
+      setLoading(false)
+    }
+    run()
   }, [activeEnv])
 
   const server = data && id ? data[id] : null

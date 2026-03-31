@@ -47,11 +47,15 @@ export function JetStreamPage() {
 
   useEffect(() => {
     if (!activeEnv) return
-    setLoading(true)
-    fetch(`/api/environments/${activeEnv}/jsz`)
-      .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
+    const run = async () => {
+      setLoading(true)
+      try {
+        const r = await fetch(`/api/environments/${activeEnv}/jsz`)
+        setData(await r.json())
+      } catch { /* */ }
+      setLoading(false)
+    }
+    run()
   }, [activeEnv])
 
   const allStreams: { account: string; stream: StreamDetail }[] = []

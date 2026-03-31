@@ -124,10 +124,10 @@ func main() {
 			bridges := manager.MQTTBridges(envName)
 			for _, b := range bridges {
 				bm := store.MQTTBridgeMetricSample{
-					BridgeID:    b.ConfiguredName,
-					InMsgsRate:  b.InMsgsRate,
-					OutMsgsRate: b.OutMsgsRate,
-					InBytesRate: b.InBytesRate,
+					BridgeID:     b.ConfiguredName,
+					InMsgsRate:   b.InMsgsRate,
+					OutMsgsRate:  b.OutMsgsRate,
+					InBytesRate:  b.InBytesRate,
 					OutBytesRate: b.OutBytesRate,
 				}
 				if bm.BridgeID == "" {

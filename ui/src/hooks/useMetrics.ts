@@ -11,6 +11,7 @@ const RANGE_SECONDS: Record<TimeRange, number> = {
 const REFRESH_INTERVAL = 30_000
 
 interface UseMetricsResult {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, any>[]
   loading: boolean
   range: TimeRange
@@ -22,12 +23,14 @@ export function useMetrics(
   endpoint: string,
   params?: Record<string, string>
 ): UseMetricsResult {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [data, setData] = useState<Record<string, any>[]>([])
   const [loading, setLoading] = useState(true)
   const [range, setRange] = useState<TimeRange>('1h')
 
   const fetchData = useCallback(async () => {
     if (!env) return
+    setLoading(true)
     const now = Math.floor(Date.now() / 1000)
     const from = now - RANGE_SECONDS[range]
 
@@ -51,7 +54,7 @@ export function useMetrics(
   }, [env, endpoint, range, params])
 
   useEffect(() => {
-    setLoading(true)
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch-on-mount is intentional
     fetchData()
   }, [fetchData])
 

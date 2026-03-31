@@ -57,10 +57,10 @@ type MQTTBridgeMetricSample struct {
 	OutMsgsRate       float64
 	InBytesRate       float64
 	OutBytesRate      float64
-	MsgsRecvQoS0     int64
-	MsgsRecvQoS1     int64
-	MsgsSentQoS0     int64
-	MsgsSentQoS1     int64
+	MsgsRecvQoS0      int64
+	MsgsRecvQoS1      int64
+	MsgsSentQoS0      int64
+	MsgsSentQoS1      int64
 }
 
 // MetricPoint represents a single time-series data point returned by queries.
@@ -332,17 +332,17 @@ func (w *MetricsWriter) QueryMQTTMetrics(env, bridgeID string, from, to, step in
 			return nil, err
 		}
 		points = append(points, MetricPoint{
-			"ts":                ts,
-			"bridge_id":         bid,
+			"ts":                 ts,
+			"bridge_id":          bid,
 			"connections_active": connActive,
-			"in_msgs_rate":      inMR,
-			"out_msgs_rate":     outMR,
-			"in_bytes_rate":     inBR,
-			"out_bytes_rate":    outBR,
-			"msgs_recv_qos0":   rQ0,
-			"msgs_recv_qos1":   rQ1,
-			"msgs_sent_qos0":   sQ0,
-			"msgs_sent_qos1":   sQ1,
+			"in_msgs_rate":       inMR,
+			"out_msgs_rate":      outMR,
+			"in_bytes_rate":      inBR,
+			"out_bytes_rate":     outBR,
+			"msgs_recv_qos0":     rQ0,
+			"msgs_recv_qos1":     rQ1,
+			"msgs_sent_qos0":     sQ0,
+			"msgs_sent_qos1":     sQ1,
 		})
 	}
 	return points, rows.Err()

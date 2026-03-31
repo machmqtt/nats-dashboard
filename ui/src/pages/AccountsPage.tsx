@@ -35,11 +35,6 @@ interface ConnInfo {
   version: string
 }
 
-interface ConnzResp {
-  connections: ConnInfo[]
-  total: number
-}
-
 interface LeafInfo {
   id: number
   name: string
@@ -60,6 +55,7 @@ export function AccountsPage() {
   const [detail, setDetail] = useState<AccountDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
   const [drilldown, setDrilldown] = useState<'connections' | 'leafs' | 'subs' | null>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [drillData, setDrillData] = useState<any>(null)
   const [drillLoading, setDrillLoading] = useState(false)
 
@@ -73,7 +69,9 @@ export function AccountsPage() {
     setLoading(false)
   }, [activeEnv])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    fetchData() // eslint-disable-line react-hooks/set-state-in-effect -- fetch-on-mount is intentional
+  }, [fetchData])
 
   const allAccounts: string[] = []
   const seen = new Set<string>()
@@ -111,6 +109,7 @@ export function AccountsPage() {
         if (res.ok) {
           const all = await res.json()
           const leafs: LeafInfo[] = []
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           for (const lz of Object.values(all) as any[]) {
             for (const l of lz.leafs || []) {
               if (l.account === expanded) leafs.push(l)
@@ -196,6 +195,7 @@ export function AccountsPage() {
                         {drilldown === 'subs' && drillData?.subscriptions && (
                           <DrillTable title={`Subscriptions (${drillData.total})`}
                             headers={['Subject', 'Queue', 'Msgs', 'Connection', 'Server']}
+                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                             rows={(drillData.subscriptions as any[]).map((s) => [
                               s.subject, s.queue || '-', fmtNum(s.msgs), s.conn_name || '-', s.server_name,
                             ])} />
@@ -229,6 +229,7 @@ function ClickableMetric({ label, value, active, onClick }: { label: string; val
   )
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function DrillTable({ title, headers, rows }: { title: string; headers: string[]; rows: any[][] }) {
   const [filters, setFilters] = useState<Record<number, string>>({})
 

@@ -104,6 +104,7 @@ export function MQTTOverviewPage() {
 
   const fetchData = useCallback(async () => {
     if (!activeEnv) return
+    setLoading(true)
     try {
       const res = await fetch(`/api/environments/${activeEnv}/mqtt/bridges`)
       if (res.ok) {
@@ -114,7 +115,9 @@ export function MQTTOverviewPage() {
     setLoading(false)
   }, [activeEnv])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    fetchData() // eslint-disable-line react-hooks/set-state-in-effect -- fetch-on-mount is intentional
+  }, [fetchData])
   useEffect(() => {
     if (!activeEnv) return
     const id = setInterval(fetchData, REFRESH_INTERVAL)

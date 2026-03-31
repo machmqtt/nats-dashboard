@@ -4,18 +4,18 @@ import "time"
 
 // MQTTBridgeStatus is the aggregated status of one MQTT bridge instance.
 type MQTTBridgeStatus struct {
-	Name             string              `json:"name"`
-	URL              string              `json:"url"`
-	Ready            bool                `json:"ready"`
-	Connections      int                 `json:"connections"`
-	NATSConnected    bool                `json:"nats_connected"`
-	ConnzAvailable   bool                `json:"connz_available"`
-	TotalConnections int64               `json:"total_connections"`
-	NATS             *MQTTNATSDiag       `json:"nats,omitempty"`
-	Connz            *MQTTConnz          `json:"connz,omitempty"`
-	Pool             *MQTTPool           `json:"pool,omitempty"`
-	Metrics          *MQTTMetrics        `json:"metrics,omitempty"`
-	Error            string              `json:"error,omitempty"`
+	Name             string        `json:"name"`
+	URL              string        `json:"url"`
+	Ready            bool          `json:"ready"`
+	Connections      int           `json:"connections"`
+	NATSConnected    bool          `json:"nats_connected"`
+	ConnzAvailable   bool          `json:"connz_available"`
+	TotalConnections int64         `json:"total_connections"`
+	NATS             *MQTTNATSDiag `json:"nats,omitempty"`
+	Connz            *MQTTConnz    `json:"connz,omitempty"`
+	Pool             *MQTTPool     `json:"pool,omitempty"`
+	Metrics          *MQTTMetrics  `json:"metrics,omitempty"`
+	Error            string        `json:"error,omitempty"`
 }
 
 // MQTTMetrics holds parsed Prometheus metrics from the bridge.
@@ -51,20 +51,20 @@ type MQTTDiag struct {
 
 // MQTTLicense mirrors the bridge /license response.
 type MQTTLicense struct {
-	Status           string `json:"status"`
-	LicenseID        string `json:"license_id,omitempty"`
-	Company          string `json:"company,omitempty"`
-	Contact          string `json:"contact,omitempty"`
-	Email            string `json:"email,omitempty"`
-	Kind             string `json:"kind,omitempty"`
-	Tier             string `json:"tier,omitempty"`
-	MaxConnections   int    `json:"max_connections"`
-	MaxQoS           int    `json:"max_qos"`
-	ConnectionsLocal int64  `json:"connections_local"`
-	ConnectionsGlobal int64 `json:"connections_global"`
-	Instances        int    `json:"instances"`
-	ExpiresAt        string `json:"expires_at,omitempty"`
-	GraceDays        int    `json:"grace_days,omitempty"`
+	Status            string `json:"status"`
+	LicenseID         string `json:"license_id,omitempty"`
+	Company           string `json:"company,omitempty"`
+	Contact           string `json:"contact,omitempty"`
+	Email             string `json:"email,omitempty"`
+	Kind              string `json:"kind,omitempty"`
+	Tier              string `json:"tier,omitempty"`
+	MaxConnections    int    `json:"max_connections"`
+	MaxQoS            int    `json:"max_qos"`
+	ConnectionsLocal  int64  `json:"connections_local"`
+	ConnectionsGlobal int64  `json:"connections_global"`
+	Instances         int    `json:"instances"`
+	ExpiresAt         string `json:"expires_at,omitempty"`
+	GraceDays         int    `json:"grace_days,omitempty"`
 }
 
 // MQTTReadyz mirrors the bridge /readyz response.
@@ -86,31 +86,31 @@ type MQTTConnz struct {
 }
 
 type MQTTClientInfo struct {
-	CID             uint64    `json:"cid"`
-	MQTTClient      string    `json:"mqtt_client"`
-	Kind            string    `json:"kind"`
-	Type            string    `json:"type"`
-	IP              string    `json:"ip"`
-	Port            int       `json:"port"`
-	Start           time.Time `json:"start,omitempty"`
-	LastActivity    time.Time `json:"last_activity,omitempty"`
-	Uptime          string    `json:"uptime,omitempty"`
-	Idle            string    `json:"idle,omitempty"`
-	PendingBytes    int       `json:"pending_bytes"`
-	InMsgs          int64     `json:"in_msgs"`
-	OutMsgs         int64     `json:"out_msgs"`
-	InBytes         int64     `json:"in_bytes"`
-	OutBytes        int64     `json:"out_bytes"`
-	Subscriptions   int       `json:"subscriptions"`
-	Lang            string    `json:"lang"`
-	IsWebSocket     bool      `json:"is_websocket,omitempty"`
-	CleanStart      bool      `json:"clean_start"`
-	KeepAlive       int       `json:"keep_alive"`
-	SessionExpiry   uint32    `json:"session_expiry_interval"`
-	ReceiveMaximum  int       `json:"receive_maximum"`
-	InflightOut     int       `json:"inflight_out"`
-	Username        string    `json:"username,omitempty"`
-	State           string    `json:"state"`
+	CID            uint64    `json:"cid"`
+	MQTTClient     string    `json:"mqtt_client"`
+	Kind           string    `json:"kind"`
+	Type           string    `json:"type"`
+	IP             string    `json:"ip"`
+	Port           int       `json:"port"`
+	Start          time.Time `json:"start,omitempty"`
+	LastActivity   time.Time `json:"last_activity,omitempty"`
+	Uptime         string    `json:"uptime,omitempty"`
+	Idle           string    `json:"idle,omitempty"`
+	PendingBytes   int       `json:"pending_bytes"`
+	InMsgs         int64     `json:"in_msgs"`
+	OutMsgs        int64     `json:"out_msgs"`
+	InBytes        int64     `json:"in_bytes"`
+	OutBytes       int64     `json:"out_bytes"`
+	Subscriptions  int       `json:"subscriptions"`
+	Lang           string    `json:"lang"`
+	IsWebSocket    bool      `json:"is_websocket,omitempty"`
+	CleanStart     bool      `json:"clean_start"`
+	KeepAlive      int       `json:"keep_alive"`
+	SessionExpiry  uint32    `json:"session_expiry_interval"`
+	ReceiveMaximum int       `json:"receive_maximum"`
+	InflightOut    int       `json:"inflight_out"`
+	Username       string    `json:"username,omitempty"`
+	State          string    `json:"state"`
 }
 
 // MQTTNATSDiag mirrors the bridge /diag/nats response.

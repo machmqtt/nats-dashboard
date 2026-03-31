@@ -15,6 +15,7 @@ export interface LineDef {
 }
 
 interface Props {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data: Record<string, any>[]
   lines: LineDef[]
   yFormatter?: (v: number) => string
@@ -57,6 +58,7 @@ export function TimeSeriesChart({ data, lines, yFormatter, height = 200 }: Props
         />
         <Tooltip
           labelFormatter={(ts) => new Date(Number(ts) * 1000).toLocaleString()}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           formatter={(value: any, name: any) => {
             const line = lines.find((l) => l.key === name)
             return [fmt(Number(value)), line?.label || String(name)]

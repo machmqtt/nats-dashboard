@@ -108,8 +108,8 @@ function computeLayout(
 
     for (let i = 0; i < nodeArr.length; i++) {
       for (let j = i + 1; j < nodeArr.length; j++) {
-        let dx = nodeArr[j].x - nodeArr[i].x
-        let dy = nodeArr[j].y - nodeArr[i].y
+        const dx = nodeArr[j].x - nodeArr[i].x
+        const dy = nodeArr[j].y - nodeArr[i].y
         const d2 = Math.max(1, dx * dx + dy * dy)
         const d = Math.sqrt(d2)
         const force = -800 * alpha / d2
@@ -274,15 +274,16 @@ export function TopologyGraphView({ data }: Props) {
   }, [graphData])
 
   const handleZoomPan = useCallback(() => {
-    const fg = fgRef.current as any
+    const fg = fgRef.current
     if (!fg) return
-    const zoom = fg.zoom()
-    const center = fg.centerAt()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- centerAt() getter not in type defs
+    const zoom = fg.zoom(), center = (fg as any).centerAt()
     if (zoom == null || center == null) return
     cameraRef.current = { zoom, center_x: center.x, center_y: center.y }
     debouncedSave(activeEnv)
   }, [activeEnv, debouncedSave])
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleNodeDragEnd = useCallback((node: any) => {
     node.fx = node.x; node.fy = node.y
     positionsRef.current[node.id] = { x: node.x, y: node.y }
@@ -307,6 +308,7 @@ export function TopologyGraphView({ data }: Props) {
     fgRef.current?.zoomToFit?.(300, 200)
   }, [])
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
     const { x, y } = node
     if (x == null || y == null) return
@@ -341,6 +343,7 @@ export function TopologyGraphView({ data }: Props) {
     ctx.fillText(label, x, y + NODE_RADIUS + fontSize + 2)
   }, [darkMode])
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const linkCanvasObject = useCallback((link: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
     const src = link.source, tgt = link.target
     if (!src?.x || !tgt?.x) return
@@ -378,6 +381,7 @@ export function TopologyGraphView({ data }: Props) {
   const w = typeof window !== 'undefined' ? window.innerWidth - sidebarW - 48 : 800
   const h = typeof window !== 'undefined' ? window.innerHeight - 88 - 24 : 600
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleLinkClick = useCallback((link: any) => {
     const srcId = typeof link.source === 'string' ? link.source : link.source.id
     const tgtId = typeof link.target === 'string' ? link.target : link.target.id
@@ -415,18 +419,21 @@ export function TopologyGraphView({ data }: Props) {
         nodeId="id"
         nodeVal="val"
         nodeCanvasObject={nodeCanvasObject}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         nodePointerAreaPaint={(node: any, color, ctx) => {
           ctx.fillStyle = color; ctx.beginPath()
           ctx.arc(node.x, node.y, NODE_RADIUS + 4, 0, 2 * Math.PI); ctx.fill()
         }}
         linkCanvasObjectMode={() => 'replace'}
         linkCanvasObject={linkCanvasObject}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         linkPointerAreaPaint={(link: any, color, ctx) => {
           const src = link.source, tgt = link.target
           if (!src?.x || !tgt?.x) return
           ctx.beginPath(); ctx.moveTo(src.x, src.y); ctx.lineTo(tgt.x, tgt.y)
           ctx.strokeStyle = color; ctx.lineWidth = 10; ctx.stroke()
         }}
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         onNodeClick={(node: any) => { setSelectedLink(null); setSelectedNode(metricsRef.current.get(node.id) || node) }}
         onNodeDrag={() => { draggingRef.current = true }}
         onNodeDragEnd={handleNodeDragEnd}

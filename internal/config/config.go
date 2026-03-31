@@ -11,17 +11,17 @@ import (
 type Config struct {
 	Listen        string        `yaml:"listen"`
 	PollInterval  time.Duration `yaml:"poll_interval"`
-	SessionSecret string       `yaml:"session_secret"`
+	SessionSecret string        `yaml:"session_secret"`
 	DataDir       string        `yaml:"data_dir"`
 	Environments  []Environment `yaml:"environments"`
 }
 
 type Environment struct {
-	Name         string            `yaml:"name"`
-	Servers      []Server          `yaml:"servers"`
-	MQTTBridges  []MQTTBridge      `yaml:"mqtt_bridges,omitempty"`
+	Name          string               `yaml:"name"`
+	Servers       []Server             `yaml:"servers"`
+	MQTTBridges   []MQTTBridge         `yaml:"mqtt_bridges,omitempty"`
 	MQTTDiscovery *MQTTDiscoveryConfig `yaml:"mqtt_discovery,omitempty"`
-	TLS          *TLSConfig        `yaml:"tls,omitempty"`
+	TLS           *TLSConfig           `yaml:"tls,omitempty"`
 }
 
 type MQTTBridge struct {
@@ -31,7 +31,7 @@ type MQTTBridge struct {
 }
 
 type MQTTDiscoveryConfig struct {
-	Enabled    *bool `yaml:"enabled,omitempty"`    // nil = true (default on)
+	Enabled    *bool `yaml:"enabled,omitempty"`     // nil = true (default on)
 	AdminPorts []int `yaml:"admin_ports,omitempty"` // default [8080]
 }
 

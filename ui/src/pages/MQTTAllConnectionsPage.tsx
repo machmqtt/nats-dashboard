@@ -160,6 +160,7 @@ export function MQTTAllConnectionsPage() {
     }),
   ], [])
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table API is intentional
   const table = useReactTable({
     data: rows,
     columns,

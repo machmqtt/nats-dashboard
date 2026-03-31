@@ -11,19 +11,19 @@ import (
 // MQTTBridgeInstance represents a discovered MQTT bridge instance.
 type MQTTBridgeInstance struct {
 	// Derived from NATS connz data.
-	IP             string  `json:"ip"`
-	ServerID       string  `json:"server_id"`
-	ServerName     string  `json:"server_name"`
-	PoolConns      int     `json:"pool_connections"`
-	TotalSubs      int     `json:"total_subs"`
-	TotalInMsgs    int64   `json:"total_in_msgs"`
-	TotalOutMsgs   int64   `json:"total_out_msgs"`
-	TotalInBytes   int64   `json:"total_in_bytes"`
-	TotalOutBytes  int64   `json:"total_out_bytes"`
-	InMsgsRate     float64 `json:"in_msgs_rate"`
-	OutMsgsRate    float64 `json:"out_msgs_rate"`
-	InBytesRate    float64 `json:"in_bytes_rate"`
-	OutBytesRate   float64 `json:"out_bytes_rate"`
+	IP            string  `json:"ip"`
+	ServerID      string  `json:"server_id"`
+	ServerName    string  `json:"server_name"`
+	PoolConns     int     `json:"pool_connections"`
+	TotalSubs     int     `json:"total_subs"`
+	TotalInMsgs   int64   `json:"total_in_msgs"`
+	TotalOutMsgs  int64   `json:"total_out_msgs"`
+	TotalInBytes  int64   `json:"total_in_bytes"`
+	TotalOutBytes int64   `json:"total_out_bytes"`
+	InMsgsRate    float64 `json:"in_msgs_rate"`
+	OutMsgsRate   float64 `json:"out_msgs_rate"`
+	InBytesRate   float64 `json:"in_bytes_rate"`
+	OutBytesRate  float64 `json:"out_bytes_rate"`
 
 	// From config or admin API.
 	ConfiguredName string            `json:"configured_name,omitempty"`

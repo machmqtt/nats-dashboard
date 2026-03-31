@@ -31,27 +31,27 @@ type Snapshot struct {
 }
 
 type ServerRates struct {
-	InMsgsRate  float64 `json:"in_msgs_rate"`
-	OutMsgsRate float64 `json:"out_msgs_rate"`
-	InBytesRate float64 `json:"in_bytes_rate"`
+	InMsgsRate   float64 `json:"in_msgs_rate"`
+	OutMsgsRate  float64 `json:"out_msgs_rate"`
+	InBytesRate  float64 `json:"in_bytes_rate"`
 	OutBytesRate float64 `json:"out_bytes_rate"`
 }
 
 // Overview is a summary for the overview page.
 type Overview struct {
-	ServerCount    int     `json:"server_count"`
-	HealthyCount   int     `json:"healthy_count"`
-	ConnectionCount int   `json:"connection_count"`
-	InMsgsRate     float64 `json:"in_msgs_rate"`
-	OutMsgsRate    float64 `json:"out_msgs_rate"`
-	InBytesRate    float64 `json:"in_bytes_rate"`
-	OutBytesRate   float64 `json:"out_bytes_rate"`
-	Subscriptions  uint32  `json:"subscriptions"`
-	JSStreams      int     `json:"js_streams"`
-	JSConsumers   int     `json:"js_consumers"`
-	JSMessages    uint64  `json:"js_messages"`
-	JSBytes       uint64  `json:"js_bytes"`
-	Servers       []ServerSummary `json:"servers"`
+	ServerCount     int             `json:"server_count"`
+	HealthyCount    int             `json:"healthy_count"`
+	ConnectionCount int             `json:"connection_count"`
+	InMsgsRate      float64         `json:"in_msgs_rate"`
+	OutMsgsRate     float64         `json:"out_msgs_rate"`
+	InBytesRate     float64         `json:"in_bytes_rate"`
+	OutBytesRate    float64         `json:"out_bytes_rate"`
+	Subscriptions   uint32          `json:"subscriptions"`
+	JSStreams       int             `json:"js_streams"`
+	JSConsumers     int             `json:"js_consumers"`
+	JSMessages      uint64          `json:"js_messages"`
+	JSBytes         uint64          `json:"js_bytes"`
+	Servers         []ServerSummary `json:"servers"`
 }
 
 type ServerSummary struct {

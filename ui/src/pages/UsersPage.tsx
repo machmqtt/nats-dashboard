@@ -38,7 +38,9 @@ export function UsersPage() {
     setLoading(false)
   }, [])
 
-  useEffect(() => { fetchUsers() }, [fetchUsers])
+  useEffect(() => {
+    fetchUsers() // eslint-disable-line react-hooks/set-state-in-effect -- fetch-on-mount is intentional
+  }, [fetchUsers])
 
   const handleCreate = async () => {
     if (!newUsername || !newPassword) {
