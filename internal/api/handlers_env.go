@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/machmqtt/nats-dashboard/internal/collector"
+	"github.com/machmqtt/nats-dashboard/internal/store"
 )
 
 func (s *Server) handleVersion(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +41,47 @@ func (s *Server) handleTopology(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, topo)
+}
+
+func (s *Server) handleGetPositions(w http.ResponseWriter, r *http.Request) {
+	env := r.PathValue("env")
+	positions, err := s.store.GetTopologyPositions(env)
+	if err != nil {
+		http.Error(w, `{"error":"failed to load positions"}`, http.StatusInternalServerError)
+		return
+	}
+	if positions == nil {
+		positions = []store.NodePosition{}
+	}
+	resp := map[string]any{"positions": positions}
+	cam, err := s.store.GetTopologyCamera(env)
+	if err == nil && cam != nil {
+		resp["camera"] = cam
+	}
+	writeJSON(w, resp)
+}
+
+func (s *Server) handleSavePositions(w http.ResponseWriter, r *http.Request) {
+	env := r.PathValue("env")
+	var body struct {
+		Positions []store.NodePosition `json:"positions"`
+		Camera    *store.CameraState   `json:"camera,omitempty"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		http.Error(w, `{"error":"invalid request body"}`, http.StatusBadRequest)
+		return
+	}
+	if err := s.store.SaveTopologyPositions(env, body.Positions); err != nil {
+		http.Error(w, `{"error":"failed to save positions"}`, http.StatusInternalServerError)
+		return
+	}
+	if body.Camera != nil {
+		if err := s.store.SaveTopologyCamera(env, *body.Camera); err != nil {
+			http.Error(w, `{"error":"failed to save camera"}`, http.StatusInternalServerError)
+			return
+		}
+	}
+	writeJSON(w, map[string]string{"status": "ok"})
 }
 
 func (s *Server) handleVarz(w http.ResponseWriter, r *http.Request) {

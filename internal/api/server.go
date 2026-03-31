@@ -30,9 +30,10 @@ type Server struct {
 	version string
 	cfg     *config.Config
 	metrics *store.MetricsWriter
+	store   *store.Store
 }
 
-func NewServer(a *auth.Auth, manager *collector.Manager, hub *ws.Hub, log *slog.Logger, version string, cfg *config.Config, metrics *store.MetricsWriter) *Server {
+func NewServer(a *auth.Auth, manager *collector.Manager, hub *ws.Hub, log *slog.Logger, version string, cfg *config.Config, metrics *store.MetricsWriter, st *store.Store) *Server {
 	s := &Server{
 		mux:     http.NewServeMux(),
 		manager: manager,
@@ -41,6 +42,7 @@ func NewServer(a *auth.Auth, manager *collector.Manager, hub *ws.Hub, log *slog.
 		version: version,
 		cfg:     cfg,
 		metrics: metrics,
+		store:   st,
 	}
 
 	s.registerRoutes(a)

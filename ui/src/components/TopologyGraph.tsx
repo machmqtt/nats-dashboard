@@ -24,7 +24,6 @@ const LINK_DASH: Record<string, number[]> = {
 }
 
 const NODE_RADIUS = 10
-const POSITIONS_KEY = 'nats-dashboard-topology-positions'
 
 function fmtRate(r: number): string {
   if (r >= 1e6) return (r / 1e6).toFixed(1) + 'M'
@@ -40,40 +39,53 @@ function structureKey(data: TGraph): string {
   return nk + '|' + lk
 }
 
-function loadPositions(): Record<string, { x: number; y: number }> {
+type PositionMap = Record<string, { x: number; y: number }>
+interface CameraState { zoom: number; center_x: number; center_y: number }
+interface SavedLayout { positions: PositionMap; camera: CameraState | null }
+
+async function fetchLayout(env: string): Promise<SavedLayout> {
   try {
-    const raw = localStorage.getItem(POSITIONS_KEY)
-    if (raw) return JSON.parse(raw)
-  } catch { /* ignore */ }
-  return {}
+    const res = await fetch(`/api/environments/${encodeURIComponent(env)}/topology/positions`)
+    if (!res.ok) return { positions: {}, camera: null }
+    const data = await res.json()
+    const map: PositionMap = {}
+    for (const p of data.positions || []) {
+      map[p.node_id] = { x: p.x, y: p.y }
+    }
+    return { positions: map, camera: data.camera || null }
+  } catch {
+    return { positions: {}, camera: null }
+  }
 }
 
-function savePositions(positions: Record<string, { x: number; y: number }>) {
+async function persistLayout(env: string, positions: PositionMap, camera: CameraState | null) {
   try {
-    localStorage.setItem(POSITIONS_KEY, JSON.stringify(positions))
-  } catch { /* ignore */ }
+    const arr = Object.entries(positions).map(([node_id, { x, y }]) => ({ node_id, x, y }))
+    await fetch(`/api/environments/${encodeURIComponent(env)}/topology/positions`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ positions: arr, camera }),
+    })
+  } catch { /* best effort */ }
 }
 
 // Compute a static layout. If all nodes have saved positions, use those.
-// Otherwise, arrange in a circle with generous spacing and run a force sim
-// to push connected nodes closer and unconnected ones apart.
+// Otherwise, arrange in a circle with generous spacing and run a force sim.
 function computeLayout(
   nodes: TGraph['nodes'],
   links: TGraph['links'],
-  savedPositions: Record<string, { x: number; y: number }>,
+  savedPositions: PositionMap,
 ): Map<string, { x: number; y: number }> {
   const pos = new Map<string, { x: number; y: number }>()
 
   if (nodes.length === 0) return pos
 
-  // If all nodes have saved positions, restore them.
   if (nodes.every((n) => savedPositions[n.id])) {
     for (const n of nodes) pos.set(n.id, { ...savedPositions[n.id] })
     return pos
   }
 
   // Initial circle layout with enough spacing that labels don't overlap.
-  // ~80px per node around the circumference.
   const circumference = Math.max(400, nodes.length * 100)
   const r = circumference / (2 * Math.PI)
 
@@ -87,7 +99,6 @@ function computeLayout(
     }
   }
 
-  // Force simulation to refine: connected nodes attract, all nodes repel.
   const nodeArr = nodes.map((n) => ({ id: n.id, ...pos.get(n.id)! }))
   const idxMap = new Map(nodeArr.map((n, i) => [n.id, i]))
 
@@ -95,14 +106,12 @@ function computeLayout(
     const alpha = 0.8 * (1 - iter / 300)
     if (alpha < 0.01) break
 
-    // Repulsion: all pairs.
     for (let i = 0; i < nodeArr.length; i++) {
       for (let j = i + 1; j < nodeArr.length; j++) {
         let dx = nodeArr[j].x - nodeArr[i].x
         let dy = nodeArr[j].y - nodeArr[i].y
         const d2 = Math.max(1, dx * dx + dy * dy)
         const d = Math.sqrt(d2)
-        // Strong repulsion, minimum distance ~120px.
         const force = -800 * alpha / d2
         const fx = force * dx
         const fy = force * dy
@@ -111,7 +120,6 @@ function computeLayout(
         nodeArr[j].x += fx
         nodeArr[j].y += fy
 
-        // Hard minimum distance.
         if (d < 120) {
           const push = (120 - d) / 2
           const ux = dx / d, uy = dy / d
@@ -123,7 +131,6 @@ function computeLayout(
       }
     }
 
-    // Spring attraction along links (target distance 180px).
     for (const link of links) {
       const si = idxMap.get(link.source)
       const ti = idxMap.get(link.target)
@@ -140,7 +147,6 @@ function computeLayout(
       nodeArr[ti].y -= fy
     }
 
-    // Gentle centering.
     for (const n of nodeArr) {
       n.x *= 1 - 0.005 * alpha
       n.y *= 1 - 0.005 * alpha
@@ -157,17 +163,48 @@ export function TopologyGraphView({ data }: Props) {
   const [selectedLink, setSelectedLink] = useState<TopologyLink | null>(null)
   const darkMode = useStore((s) => s.darkMode)
   const sidebarOpen = useStore((s) => s.sidebarOpen)
-  const prevKeyRef = useRef('')
+  const activeEnv = useStore((s) => s.activeEnv)
   const initialFitDone = useRef(false)
+  const draggingRef = useRef(false)
 
   const metricsRef = useRef(new Map<string, TopologyNode>())
   const linkMetricsRef = useRef(new Map<string, TopologyLink>())
-  const positionsRef = useRef(loadPositions())
+  const positionsRef = useRef<PositionMap>({})
+  const positionsLoaded = useRef(false)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cameraRef = useRef<CameraState | null>(null)
+  const savedCameraRef = useRef<CameraState | null>(null)
+
+  // Keep a ref to the latest data so drag-end can access it without a stale closure.
+  const dataRef = useRef(data)
+  dataRef.current = data
+
+  // Load saved positions + camera from server on mount / env change.
+  const [ready, setReady] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    positionsLoaded.current = false
+    setReady(false)
+    fetchLayout(activeEnv).then((layout) => {
+      if (cancelled) return
+      positionsRef.current = layout.positions
+      savedCameraRef.current = layout.camera
+      positionsLoaded.current = true
+      setReady(true)
+    })
+    return () => { cancelled = true }
+  }, [activeEnv])
+
+  const debouncedSave = useCallback((env: string) => {
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      persistLayout(env, positionsRef.current, cameraRef.current)
+    }, 500)
+  }, [])
 
   const curKey = structureKey(data)
-  prevKeyRef.current = curKey
 
-  // Update metrics.
+  // Update metrics refs (always, even during drag — these don't affect layout).
   for (const n of data.nodes) metricsRef.current.set(n.id, n)
   for (const l of data.links) linkMetricsRef.current.set(`${l.source}>${l.target}`, l)
 
@@ -179,14 +216,25 @@ export function TopologyGraphView({ data }: Props) {
     }
   }
 
+  // Freeze graph structure updates while dragging so nodes don't snap back.
+  // Only update the effective key when not dragging; on drag end we sync it.
+  const [effectiveKey, setEffectiveKey] = useState('')
+  useEffect(() => {
+    if (!draggingRef.current) {
+      setEffectiveKey(curKey)
+    }
+  }, [curKey])
+
   const graphData = useMemo(() => {
-    const layout = computeLayout(data.nodes, data.links, positionsRef.current)
-    const saved: Record<string, { x: number; y: number }> = {}
+    if (!ready) return { nodes: [], links: [] }
+
+    const d = dataRef.current
+    const layout = computeLayout(d.nodes, d.links, positionsRef.current)
+    const saved: PositionMap = {}
     for (const [id, p] of layout) saved[id] = p
     positionsRef.current = saved
-    savePositions(saved)
 
-    const nodes = data.nodes.map((n) => {
+    const nodes = d.nodes.map((n) => {
       const p = layout.get(n.id) || { x: 0, y: 0 }
       return {
         id: n.id, name: n.name, type: n.type,
@@ -197,7 +245,7 @@ export function TopologyGraphView({ data }: Props) {
       }
     })
 
-    const links = data.links.map((l) => ({
+    const links = d.links.map((l) => ({
       source: l.source, target: l.target, type: l.type,
       in_msgs_rate: l.in_msgs_rate, out_msgs_rate: l.out_msgs_rate,
     }))
@@ -205,28 +253,58 @@ export function TopologyGraphView({ data }: Props) {
     initialFitDone.current = false
     return { nodes, links }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [curKey])
+  }, [effectiveKey, ready])
 
   useEffect(() => {
-    if (!initialFitDone.current) {
+    if (!initialFitDone.current && graphData.nodes.length > 0) {
       initialFitDone.current = true
-      setTimeout(() => fgRef.current?.zoomToFit?.(300, 80), 100)
+      const cam = savedCameraRef.current
+      if (cam && cam.zoom > 0) {
+        // Restore saved camera position.
+        setTimeout(() => {
+          const fg = fgRef.current
+          if (!fg) return
+          fg.centerAt(cam.center_x, cam.center_y, 0)
+          fg.zoom(cam.zoom, 0)
+          cameraRef.current = cam
+        }, 100)
+      } else {
+        setTimeout(() => fgRef.current?.zoomToFit?.(300, 200), 100)
+      }
     }
   }, [graphData])
+
+  const handleZoomPan = useCallback(({ k, x, y }: { k: number; x: number; y: number }) => {
+    const fg = fgRef.current
+    if (!fg) return
+    // The transform gives us the d3 zoom transform; derive center from canvas dimensions.
+    const cw = typeof window !== 'undefined' ? window.innerWidth : 800
+    const ch = typeof window !== 'undefined' ? window.innerHeight : 600
+    const centerX = (cw / 2 - x) / k
+    const centerY = (ch / 2 - y) / k
+    cameraRef.current = { zoom: k, center_x: centerX, center_y: centerY }
+    debouncedSave(activeEnv)
+  }, [activeEnv, debouncedSave])
 
   const handleNodeDragEnd = useCallback((node: any) => {
     node.fx = node.x; node.fy = node.y
     positionsRef.current[node.id] = { x: node.x, y: node.y }
-    savePositions(positionsRef.current)
-  }, [])
+    draggingRef.current = false
+    debouncedSave(activeEnv)
+    // Apply any topology changes that arrived during the drag.
+    const latestKey = structureKey(dataRef.current)
+    setEffectiveKey(latestKey)
+  }, [activeEnv, debouncedSave])
 
   const [, forceUpdate] = useState(0)
   const handleResetLayout = useCallback(() => {
-    localStorage.removeItem(POSITIONS_KEY)
     positionsRef.current = {}
-    prevKeyRef.current = ''
+    cameraRef.current = null
+    savedCameraRef.current = null
+    persistLayout(activeEnv, {}, null)
+    initialFitDone.current = false
     forceUpdate((n) => n + 1)
-  }, [])
+  }, [activeEnv])
 
   const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
     const { x, y } = node
@@ -241,7 +319,6 @@ export function TopologyGraphView({ data }: Props) {
     } else if (m.type === 'leaf') {
       ctx.moveTo(x, y - NODE_RADIUS); ctx.lineTo(x + NODE_RADIUS, y + NODE_RADIUS * 0.7); ctx.lineTo(x - NODE_RADIUS, y + NODE_RADIUS * 0.7); ctx.closePath()
     } else if (m.type === 'mqtt') {
-      // Hexagon shape for MQTT bridges.
       const r = NODE_RADIUS
       for (let i = 0; i < 6; i++) {
         const a = (Math.PI / 3) * i - Math.PI / 2
@@ -279,7 +356,6 @@ export function TopologyGraphView({ data }: Props) {
     ctx.strokeStyle = darkMode ? '#555' : '#999'
     ctx.lineWidth = width; ctx.stroke(); ctx.setLineDash([])
 
-    // Rate label at midpoint.
     const mx = (src.x + tgt.x) / 2, my = (src.y + tgt.y) / 2
     const label = rate > 0 ? fmtRate(rate) + '/s' : ''
     if (label) {
@@ -297,7 +373,7 @@ export function TopologyGraphView({ data }: Props) {
     }
   }, [darkMode])
 
-  const sidebarW = sidebarOpen ? 256 : 0
+  const sidebarW = sidebarOpen ? 256 : 56
   const w = typeof window !== 'undefined' ? window.innerWidth - sidebarW - 48 : 800
   const h = typeof window !== 'undefined' ? window.innerHeight - 88 - 24 : 600
 
@@ -342,11 +418,14 @@ export function TopologyGraphView({ data }: Props) {
           ctx.strokeStyle = color; ctx.lineWidth = 10; ctx.stroke()
         }}
         onNodeClick={(node: any) => { setSelectedLink(null); setSelectedNode(metricsRef.current.get(node.id) || node) }}
+        onNodeDrag={() => { draggingRef.current = true }}
         onNodeDragEnd={handleNodeDragEnd}
         onLinkClick={handleLinkClick}
+        onZoomEnd={handleZoomPan}
         enableNodeDrag={true}
         backgroundColor={darkMode ? '#1f2937' : '#ffffff'}
         cooldownTicks={0}
+        cooldownTime={0}
         width={w}
         height={h}
       />

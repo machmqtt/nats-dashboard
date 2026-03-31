@@ -176,6 +176,32 @@ func (s *Store) migrate() error {
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_mqtt_bridge_metrics_env_bid_ts ON mqtt_bridge_metrics (env, bridge_id, ts)`)
 	s.db.Exec(`CREATE INDEX IF NOT EXISTS idx_mqtt_bridge_metrics_ts ON mqtt_bridge_metrics (ts)`)
 
+	// Topology node position persistence.
+	_, err = s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS topology_positions (
+			env TEXT NOT NULL,
+			node_id TEXT NOT NULL,
+			x REAL NOT NULL,
+			y REAL NOT NULL,
+			PRIMARY KEY (env, node_id)
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	_, err = s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS topology_camera (
+			env TEXT NOT NULL PRIMARY KEY,
+			zoom REAL NOT NULL,
+			center_x REAL NOT NULL,
+			center_y REAL NOT NULL
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -386,4 +412,91 @@ func (s *Store) DeleteStaleMQTTBridges(env string, olderThan time.Duration) erro
 		env, time.Now().Add(-olderThan),
 	)
 	return err
+}
+
+// NodePosition is a persisted topology node position.
+type NodePosition struct {
+	NodeID string  `json:"node_id"`
+	X      float64 `json:"x"`
+	Y      float64 `json:"y"`
+}
+
+func (s *Store) GetTopologyPositions(env string) ([]NodePosition, error) {
+	rows, err := s.db.Query(
+		"SELECT node_id, x, y FROM topology_positions WHERE env = ?", env,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var positions []NodePosition
+	for rows.Next() {
+		var p NodePosition
+		if err := rows.Scan(&p.NodeID, &p.X, &p.Y); err != nil {
+			return nil, err
+		}
+		positions = append(positions, p)
+	}
+	return positions, rows.Err()
+}
+
+// CameraState is a persisted topology camera (zoom + pan).
+type CameraState struct {
+	Zoom    float64 `json:"zoom"`
+	CenterX float64 `json:"center_x"`
+	CenterY float64 `json:"center_y"`
+}
+
+func (s *Store) GetTopologyCamera(env string) (*CameraState, error) {
+	var c CameraState
+	err := s.db.QueryRow(
+		"SELECT zoom, center_x, center_y FROM topology_camera WHERE env = ?", env,
+	).Scan(&c.Zoom, &c.CenterX, &c.CenterY)
+	if err != nil {
+		return nil, err
+	}
+	return &c, nil
+}
+
+func (s *Store) SaveTopologyCamera(env string, c CameraState) error {
+	_, err := s.db.Exec(`
+		INSERT INTO topology_camera (env, zoom, center_x, center_y)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(env) DO UPDATE SET zoom = excluded.zoom, center_x = excluded.center_x, center_y = excluded.center_y
+	`, env, c.Zoom, c.CenterX, c.CenterY)
+	return err
+}
+
+func (s *Store) DeleteTopologyCamera(env string) error {
+	_, err := s.db.Exec("DELETE FROM topology_camera WHERE env = ?", env)
+	return err
+}
+
+func (s *Store) SaveTopologyPositions(env string, positions []NodePosition) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("DELETE FROM topology_positions WHERE env = ?", env); err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(
+		"INSERT INTO topology_positions (env, node_id, x, y) VALUES (?, ?, ?, ?)",
+	)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, p := range positions {
+		if _, err := stmt.Exec(env, p.NodeID, p.X, p.Y); err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }

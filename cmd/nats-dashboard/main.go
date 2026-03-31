@@ -152,7 +152,7 @@ func main() {
 	}
 	manager.Start(ctx)
 
-	srv := api.NewServer(a, manager, hub, log, version, cfg, metricsWriter)
+	srv := api.NewServer(a, manager, hub, log, version, cfg, metricsWriter, db)
 
 	httpServer := &http.Server{
 		Addr:    cfg.Listen,

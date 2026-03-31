@@ -18,7 +18,7 @@ export function Shell({ username, role, version, onLogout }: Props) {
     <div className={darkMode ? 'dark' : ''}>
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 dark:text-gray-100">
         <Sidebar username={username} role={role} version={version} onLogout={onLogout} />
-        <main className={`transition-[margin] duration-200 p-6 ${sidebarOpen ? 'ml-64' : 'ml-0'}`}>
+        <main className={`transition-[margin] duration-200 p-6 ${sidebarOpen ? 'ml-64' : 'ml-14'}`}>
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

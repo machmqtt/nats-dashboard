@@ -38,7 +38,7 @@ func setupTestServer(t *testing.T) (*Server, *auth.Auth, string) {
 	hub := ws.NewHub(log)
 	mgr, _ := collector.NewManager(cfg, nil, log, s)
 
-	srv := NewServer(a, mgr, hub, log, "test", cfg, nil)
+	srv := NewServer(a, mgr, hub, log, "test", cfg, nil, s)
 	return srv, a, token
 }
 
