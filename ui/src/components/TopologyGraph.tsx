@@ -3,7 +3,7 @@ import ForceGraph2D, { type ForceGraphMethods } from 'react-force-graph-2d'
 import type { TopologyGraph as TGraph, TopologyNode, TopologyLink } from '../store/store'
 import { useStore } from '../store/store'
 import { NodeDetailPanel } from './NodeDetailPanel'
-import { X, RotateCcw } from 'lucide-react'
+import { X, RotateCcw, Maximize } from 'lucide-react'
 
 interface Props {
   data: TGraph
@@ -250,17 +250,16 @@ export function TopologyGraphView({ data }: Props) {
       in_msgs_rate: l.in_msgs_rate, out_msgs_rate: l.out_msgs_rate,
     }))
 
-    initialFitDone.current = false
     return { nodes, links }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveKey, ready])
 
+  // Set initial camera once when graph first has nodes.
   useEffect(() => {
     if (!initialFitDone.current && graphData.nodes.length > 0) {
       initialFitDone.current = true
       const cam = savedCameraRef.current
       if (cam && cam.zoom > 0) {
-        // Restore saved camera position.
         setTimeout(() => {
           const fg = fgRef.current
           if (!fg) return
@@ -274,15 +273,13 @@ export function TopologyGraphView({ data }: Props) {
     }
   }, [graphData])
 
-  const handleZoomPan = useCallback(({ k, x, y }: { k: number; x: number; y: number }) => {
-    const fg = fgRef.current
+  const handleZoomPan = useCallback(() => {
+    const fg = fgRef.current as any
     if (!fg) return
-    // The transform gives us the d3 zoom transform; derive center from canvas dimensions.
-    const cw = typeof window !== 'undefined' ? window.innerWidth : 800
-    const ch = typeof window !== 'undefined' ? window.innerHeight : 600
-    const centerX = (cw / 2 - x) / k
-    const centerY = (ch / 2 - y) / k
-    cameraRef.current = { zoom: k, center_x: centerX, center_y: centerY }
+    const zoom = fg.zoom()
+    const center = fg.centerAt()
+    if (zoom == null || center == null) return
+    cameraRef.current = { zoom, center_x: center.x, center_y: center.y }
     debouncedSave(activeEnv)
   }, [activeEnv, debouncedSave])
 
@@ -305,6 +302,10 @@ export function TopologyGraphView({ data }: Props) {
     initialFitDone.current = false
     forceUpdate((n) => n + 1)
   }, [activeEnv])
+
+  const handleCenter = useCallback(() => {
+    fgRef.current?.zoomToFit?.(300, 200)
+  }, [])
 
   const nodeCanvasObject = useCallback((node: any, ctx: CanvasRenderingContext2D, globalScale: number) => {
     const { x, y } = node
@@ -391,13 +392,22 @@ export function TopologyGraphView({ data }: Props) {
 
   return (
     <div className="relative" style={{ width: w, height: h }}>
-      <button
-        onClick={handleResetLayout}
-        className="absolute top-2 right-2 z-10 bg-white dark:bg-gray-700 border dark:border-gray-600 rounded px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-gray-50 dark:hover:bg-gray-600 shadow-sm"
-        title="Reset layout to auto-arrange"
-      >
-        <RotateCcw className="w-3 h-3" /> Reset Layout
-      </button>
+      <div className="absolute top-2 right-2 z-10 flex gap-1.5">
+        <button
+          onClick={handleCenter}
+          className="bg-white dark:bg-gray-700 border dark:border-gray-600 rounded px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-gray-50 dark:hover:bg-gray-600 shadow-sm"
+          title="Center graph in view"
+        >
+          <Maximize className="w-3 h-3" /> Center
+        </button>
+        <button
+          onClick={handleResetLayout}
+          className="bg-white dark:bg-gray-700 border dark:border-gray-600 rounded px-3 py-1.5 text-xs flex items-center gap-1.5 hover:bg-gray-50 dark:hover:bg-gray-600 shadow-sm"
+          title="Reset layout to auto-arrange"
+        >
+          <RotateCcw className="w-3 h-3" /> Reset Layout
+        </button>
+      </div>
 
       <ForceGraph2D
         ref={fgRef}
