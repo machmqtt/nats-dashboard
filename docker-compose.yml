@@ -1,0 +1,69 @@
+services:
+  nats-1:
+    image: nats:2.11-alpine
+    command: >
+      -n nats-1
+      -p 4222
+      -m 8222
+      --cluster_name dc1
+      --cluster nats://0.0.0.0:6222
+      --routes nats-route://nats-1:6222,nats-route://nats-2:6222,nats-route://nats-3:6222
+      --js
+      --sd /data
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats1-data:/data
+
+  nats-2:
+    image: nats:2.11-alpine
+    command: >
+      -n nats-2
+      -p 4222
+      -m 8222
+      --cluster_name dc1
+      --cluster nats://0.0.0.0:6222
+      --routes nats-route://nats-1:6222,nats-route://nats-2:6222,nats-route://nats-3:6222
+      --js
+      --sd /data
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+    volumes:
+      - nats2-data:/data
+
+  nats-3:
+    image: nats:2.11-alpine
+    command: >
+      -n nats-3
+      -p 4222
+      -m 8222
+      --cluster_name dc1
+      --cluster nats://0.0.0.0:6222
+      --routes nats-route://nats-1:6222,nats-route://nats-2:6222,nats-route://nats-3:6222
+      --js
+      --sd /data
+    ports:
+      - "4224:4222"
+      - "8224:8222"
+    volumes:
+      - nats3-data:/data
+
+  dashboard:
+    build: .
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config.docker.yaml:/etc/nats-dashboard/config.yaml:ro
+      - dashboard-data:/data
+    depends_on:
+      - nats-1
+      - nats-2
+      - nats-3
+
+volumes:
+  nats1-data:
+  nats2-data:
+  nats3-data:
+  dashboard-data:

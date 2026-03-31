@@ -1,0 +1,441 @@
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useParams, Link } from 'react-router-dom'
+import { useStore } from '../store/store'
+import { TableSkeleton } from '../components/Skeleton'
+import { ArrowLeft } from 'lucide-react'
+import { TimeSeriesChart } from '../components/TimeSeriesChart'
+import { TimeRangeSelector } from '../components/TimeRangeSelector'
+import { useMetrics } from '../hooks/useMetrics'
+
+type Tab = 'nats' | 'metrics' | 'pool' | 'license' | 'config'
+
+const REFRESH_INTERVAL = 10_000
+
+export function MQTTBridgeDetailPage() {
+  const { bridge } = useParams<{ bridge: string }>()
+  const activeEnv = useStore((s) => s.activeEnv)
+  const [tab, setTab] = useState<Tab>('nats')
+  const [nats, setNats] = useState<any>(null)
+  const [metrics, setMetrics] = useState<any>(null)
+  const [pool, setPool] = useState<any>(null)
+  const [license, setLicense] = useState<any>(null)
+  const [diag, setDiag] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  const bridgeMetricsParams = useMemo(() => (bridge ? { bridge_id: bridge } : undefined), [bridge])
+  const bridgeMetrics = useMetrics(activeEnv, 'metrics/mqtt', bridgeMetricsParams)
+
+  const fetchAll = useCallback(async () => {
+    if (!activeEnv || !bridge) return
+    const b = encodeURIComponent(bridge)
+    const base = `/api/environments/${activeEnv}/mqtt/${b}`
+    const results = await Promise.allSettled([
+      fetch(`${base}/diag`).then(r => r.ok ? r.json() : null),
+      fetch(`${base}/metrics`).then(r => r.ok ? r.json() : null),
+      fetch(`${base}/pool`).then(r => r.ok ? r.json() : null),
+      fetch(`${base}/license`).then(r => r.ok ? r.json() : null),
+      fetch(`${base}/diag/config`).then(r => r.ok ? r.json() : null),
+    ])
+    setNats(results[0].status === 'fulfilled' ? results[0].value : null)
+    setMetrics(results[1].status === 'fulfilled' ? results[1].value : null)
+    setPool(results[2].status === 'fulfilled' ? results[2].value : null)
+    setLicense(results[3].status === 'fulfilled' ? results[3].value : null)
+    setDiag(results[4].status === 'fulfilled' ? results[4].value : null)
+    setLoading(false)
+  }, [activeEnv, bridge])
+
+  useEffect(() => { fetchAll() }, [fetchAll])
+  useEffect(() => {
+    if (!activeEnv || !bridge) return
+    const id = setInterval(fetchAll, REFRESH_INTERVAL)
+    return () => clearInterval(id)
+  }, [activeEnv, bridge, fetchAll])
+
+  const tabs: { id: Tab; label: string }[] = [
+    { id: 'nats', label: 'NATS Connection' },
+    { id: 'metrics', label: 'Metrics' },
+    { id: 'pool', label: 'Connection Pool' },
+    { id: 'license', label: 'License' },
+    { id: 'config', label: 'Config' },
+  ]
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 mb-4">
+        <Link to="/mqtt" className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+          <ArrowLeft className="w-5 h-5" />
+        </Link>
+        <h1 className="text-2xl font-semibold">{bridge}</h1>
+        {diag?.version && <span className="text-xs text-gray-400 bg-gray-100 dark:bg-gray-700 rounded px-2 py-0.5">{diag.version}</span>}
+      </div>
+
+      <div className="flex gap-1 mb-4 border-b dark:border-gray-700">
+        {tabs.map(t => (
+          <button
+            key={t.id}
+            onClick={() => setTab(t.id)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === t.id
+                ? 'border-nats-blue text-nats-blue'
+                : 'border-transparent text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+            }`}
+          >
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {loading ? <TableSkeleton rows={5} cols={4} /> : (
+        <>
+          {tab === 'nats' && <NATSTab data={nats} />}
+          {tab === 'metrics' && <MetricsTab data={metrics} tsMetrics={bridgeMetrics} />}
+          {tab === 'pool' && <PoolTab data={pool} />}
+          {tab === 'license' && <LicenseTab data={license} />}
+          {tab === 'config' && <ConfigTab data={diag} />}
+        </>
+      )}
+    </div>
+  )
+}
+
+function NATSTab({ data }: { data: any }) {
+  if (!data) return <Empty msg="NATS diagnostics not available" />
+  const c = data.connection
+  return (
+    <div className="space-y-6">
+      <Section title="Connection">
+        <Grid>
+          <DI label="Connected" value={c?.connected ? 'Yes' : 'No'} />
+          <DI label="Reconnecting" value={c?.reconnecting ? 'Yes' : 'No'} />
+          <DI label="Draining" value={c?.draining ? 'Yes' : 'No'} />
+          <DI label="URL" value={c?.url} />
+          <DI label="Server Name" value={c?.server_name} />
+          <DI label="Server Version" value={c?.server_version} />
+          <DI label="Cluster" value={c?.cluster_name || '-'} />
+          <DI label="RTT" value={c?.rtt || '-'} />
+          <DI label="Max Payload" value={fmtBytes(c?.max_payload || 0)} />
+          <DI label="Subscriptions" value={(c?.subscriptions || 0).toLocaleString()} />
+          <DI label="Reconnects" value={(c?.reconnects || 0).toLocaleString()} />
+          <DI label="Msgs In" value={fmtNum(c?.in_msgs || 0)} />
+          <DI label="Msgs Out" value={fmtNum(c?.out_msgs || 0)} />
+          <DI label="Bytes In" value={fmtBytes(c?.in_bytes || 0)} />
+          <DI label="Bytes Out" value={fmtBytes(c?.out_bytes || 0)} />
+        </Grid>
+        {c?.server_id && (
+          <div className="mt-3">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Server ID</div>
+            <div className="font-mono text-xs bg-gray-100 dark:bg-gray-700 rounded px-2 py-1 break-all">{c.server_id}</div>
+          </div>
+        )}
+        {c?.servers && c.servers.length > 0 && (
+          <div className="mt-3">
+            <div className="text-xs text-gray-500 dark:text-gray-400 mb-1">Known Servers</div>
+            <div className="flex flex-wrap gap-2">
+              {c.servers.map((s: string, i: number) => (
+                <span key={i} className="font-mono text-xs bg-gray-100 dark:bg-gray-700 rounded px-2 py-0.5">{s}</span>
+              ))}
+            </div>
+          </div>
+        )}
+      </Section>
+
+      {data.account && (
+        <Section title="JetStream Account">
+          <Grid>
+            <DI label="Domain" value={data.account.domain || '-'} />
+            <DI label="Memory" value={fmtBytes(data.account.memory_bytes || 0)} />
+            <DI label="Storage" value={fmtBytes(data.account.store_bytes || 0)} />
+            <DI label="Streams" value={(data.account.streams || 0).toString()} />
+            <DI label="Consumers" value={(data.account.consumers || 0).toString()} />
+          </Grid>
+        </Section>
+      )}
+
+      {data.streams && data.streams.length > 0 && (
+        <Section title="Streams">
+          <Table
+            headers={['Name', 'Messages', 'Bytes', 'Consumers', 'Subjects', 'First Seq', 'Last Seq', 'Created', 'Error']}
+            rows={data.streams.map((s: any) => [
+              s.name, fmtNum(s.messages), fmtBytes(s.bytes), s.consumers,
+              s.num_subjects || 0, s.first_seq, s.last_seq,
+              s.created ? new Date(s.created).toLocaleString() : '-',
+              s.error || '-',
+            ])}
+          />
+        </Section>
+      )}
+
+      {data.kv_buckets && data.kv_buckets.length > 0 && (
+        <Section title="KV Buckets">
+          <Table
+            headers={['Bucket', 'Values', 'Bytes', 'TTL', 'Error']}
+            rows={data.kv_buckets.map((kv: any) => [
+              kv.bucket, fmtNum(kv.values), fmtBytes(kv.bytes),
+              kv.ttl || '-', kv.error || '-',
+            ])}
+          />
+        </Section>
+      )}
+    </div>
+  )
+}
+
+function MetricsTab({ data, tsMetrics }: { data: any; tsMetrics: ReturnType<typeof useMetrics> }) {
+  if (!data) return <Empty msg="Metrics not available" />
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="font-medium text-sm">Trends</h3>
+        <TimeRangeSelector value={tsMetrics.range} onChange={tsMetrics.setRange} />
+      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Connections</h3>
+          <TimeSeriesChart
+            data={tsMetrics.data}
+            lines={[
+              { key: 'connections_active', color: '#a855f7', label: 'Active' },
+            ]}
+            yFormatter={(v) => v.toFixed(0)}
+          />
+        </div>
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Message Rate</h3>
+          <TimeSeriesChart
+            data={tsMetrics.data}
+            lines={[
+              { key: 'in_msgs_rate', color: '#22c55e', label: 'In msgs/s' },
+              { key: 'out_msgs_rate', color: '#f97316', label: 'Out msgs/s' },
+            ]}
+            yFormatter={fmtRateAxis}
+          />
+        </div>
+      </div>
+
+      <Section title="Connections">
+        <Grid>
+          <DI label="Active" value={fmtNum(data.connections_active)} />
+          <DI label="Total Accepted" value={fmtNum(data.connections_total)} />
+          <DI label="Rejected" value={fmtNum(data.connections_rejected)} />
+          <DI label="WS Active" value={fmtNum(data.ws_connections_active)} />
+          <DI label="WS Total" value={fmtNum(data.ws_connections_total)} />
+        </Grid>
+      </Section>
+      <Section title="Authentication">
+        <Grid>
+          <DI label="Auth Success" value={fmtNum(data.auth_success)} />
+          <DI label="Auth Failure" value={fmtNum(data.auth_failure)} />
+        </Grid>
+      </Section>
+      <Section title="MQTT Messages">
+        <Grid>
+          <DI label="Recv QoS 0" value={fmtNum(data.msgs_recv_qos0)} />
+          <DI label="Recv QoS 1" value={fmtNum(data.msgs_recv_qos1)} />
+          <DI label="Recv QoS 2" value={fmtNum(data.msgs_recv_qos2)} />
+          <DI label="Sent QoS 0" value={fmtNum(data.msgs_sent_qos0)} />
+          <DI label="Sent QoS 1" value={fmtNum(data.msgs_sent_qos1)} />
+          <DI label="Sent QoS 2" value={fmtNum(data.msgs_sent_qos2)} />
+        </Grid>
+      </Section>
+      <Section title="Protocol">
+        <Grid>
+          <DI label="Subscribes" value={fmtNum(data.subscribes)} />
+          <DI label="Unsubscribes" value={fmtNum(data.unsubscribes)} />
+          <DI label="Keepalive Timeouts" value={fmtNum(data.keepalive_timeouts)} />
+        </Grid>
+      </Section>
+      <Section title="Connection Pool">
+        <Grid>
+          <DI label="Pool Publishes" value={fmtNum(data.pool_publishes)} />
+          <DI label="Pool Subscribes" value={fmtNum(data.pool_subscribes)} />
+        </Grid>
+      </Section>
+      <Section title="NATS">
+        <Grid>
+          <DI label="Disconnects" value={fmtNum(data.nats_disconnects)} />
+          <DI label="Reconnects" value={fmtNum(data.nats_reconnects)} />
+        </Grid>
+      </Section>
+    </div>
+  )
+}
+
+function PoolTab({ data }: { data: any }) {
+  if (!data || !data.slots) return <Empty msg="Connection pool not available (pool_size may be 0)" />
+  const slots = data.slots as any[]
+  const connected = slots.filter((s) => s.connected).length
+  const totalSubs = slots.reduce((a: number, s: any) => a + s.sub_count, 0)
+  const totalPubs = slots.reduce((a: number, s: any) => a + s.pub_count, 0)
+  const totalFlush = slots.reduce((a: number, s: any) => a + s.flush_count, 0)
+  const maxSubs = Math.max(...slots.map((s: any) => s.sub_count), 1)
+
+  return (
+    <div className="space-y-6">
+      <Section title="Summary">
+        <Grid>
+          <DI label="Pool Size" value={data.size.toString()} />
+          <DI label="Connected" value={`${connected}/${data.size}`} />
+          <DI label="Total Subscriptions" value={fmtNum(totalSubs)} />
+          <DI label="Total Publishes" value={fmtNum(totalPubs)} />
+          <DI label="Total Flushes" value={fmtNum(totalFlush)} />
+          <DI label="Avg Subs/Slot" value={(totalSubs / Math.max(data.size, 1)).toFixed(0)} />
+        </Grid>
+      </Section>
+
+      <Section title="Subscription Distribution">
+        <div className="flex items-end gap-px h-20">
+          {slots.map((slot: any) => {
+            const pct = (slot.sub_count / maxSubs) * 100
+            return (
+              <div
+                key={slot.index}
+                className="flex-1 min-w-[4px] rounded-t-sm cursor-default"
+                style={{
+                  height: `${Math.max(4, pct)}%`,
+                  backgroundColor: slot.connected ? '#27aae1' : '#ef4444',
+                  opacity: slot.connected ? 0.5 + (pct / 200) : 1,
+                }}
+                title={`Slot ${slot.index}: ${slot.sub_count.toLocaleString()} subs`}
+              />
+            )
+          })}
+        </div>
+        <div className="flex justify-between text-[10px] text-gray-400 mt-1">
+          <span>Slot 0</span>
+          <span>Slot {data.size - 1}</span>
+        </div>
+      </Section>
+
+      <Section title="All Slots">
+        <Table
+          headers={['Slot', 'Connected', 'Subscriptions', 'Publishes', 'Flushes']}
+          rows={slots.map((s: any) => [
+            s.index,
+            s.connected ? 'Yes' : 'No',
+            s.sub_count.toLocaleString(),
+            s.pub_count.toLocaleString(),
+            s.flush_count.toLocaleString(),
+          ])}
+        />
+      </Section>
+    </div>
+  )
+}
+
+function LicenseTab({ data }: { data: any }) {
+  if (!data) return <Empty msg="License information not available" />
+  return (
+    <Section title="License">
+      <Grid>
+        <DI label="Status" value={data.status} />
+        <DI label="License ID" value={data.license_id || '-'} />
+        <DI label="Company" value={data.company || '-'} />
+        <DI label="Contact" value={data.contact || '-'} />
+        <DI label="Email" value={data.email || '-'} />
+        <DI label="Kind" value={data.kind || '-'} />
+        <DI label="Tier" value={data.tier || '-'} />
+        <DI label="Max Connections" value={data.max_connections === 0 ? 'Unlimited' : data.max_connections.toLocaleString()} />
+        <DI label="Max QoS" value={data.max_qos.toString()} />
+        <DI label="Connections (Local)" value={data.connections_local.toLocaleString()} />
+        <DI label="Connections (Global)" value={data.connections_global.toLocaleString()} />
+        <DI label="Instances" value={data.instances.toString()} />
+        <DI label="Expires At" value={data.expires_at || 'Never'} />
+        <DI label="Grace Days" value={data.grace_days?.toString() || '-'} />
+      </Grid>
+    </Section>
+  )
+}
+
+function ConfigTab({ data }: { data: any }) {
+  if (!data) return <Empty msg="Configuration not available" />
+  return (
+    <div className="space-y-4">
+      {data.version && (
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          <Grid>
+            <DI label="Version" value={data.version} />
+            <DI label="Config Path" value={data.config_path} />
+          </Grid>
+        </div>
+      )}
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <h3 className="font-medium text-sm mb-3">Running Configuration</h3>
+        <pre className="bg-gray-50 dark:bg-gray-900 rounded p-4 text-xs font-mono overflow-x-auto max-h-[600px] overflow-y-auto whitespace-pre-wrap">
+          {JSON.stringify(data.config, null, 2)}
+        </pre>
+      </div>
+    </div>
+  )
+}
+
+// Shared components
+
+function Empty({ msg }: { msg: string }) {
+  return <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-8 text-center text-gray-500 dark:text-gray-400">{msg}</div>
+}
+
+function Section({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+      <h3 className="font-medium text-sm mb-3">{title}</h3>
+      {children}
+    </div>
+  )
+}
+
+function Grid({ children }: { children: React.ReactNode }) {
+  return <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 text-sm">{children}</div>
+}
+
+function DI({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div>
+      <div className="text-gray-500 dark:text-gray-400 text-xs">{label}</div>
+      <div className={`font-medium ${mono ? 'font-mono text-xs' : ''}`}>{value || '-'}</div>
+    </div>
+  )
+}
+
+function Table({ headers, rows }: { headers: string[]; rows: any[][] }) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 dark:bg-gray-700 text-left text-gray-500 dark:text-gray-400">
+          <tr>{headers.map((h, i) => <th key={i} className="px-3 py-2 whitespace-nowrap">{h}</th>)}</tr>
+        </thead>
+        <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+          {rows.map((row, i) => (
+            <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+              {row.map((cell, j) => <td key={j} className="px-3 py-1.5 whitespace-nowrap">{cell}</td>)}
+            </tr>
+          ))}
+          {rows.length === 0 && (
+            <tr><td colSpan={headers.length} className="px-3 py-4 text-center text-gray-400">None</td></tr>
+          )}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function fmtNum(n: number): string {
+  if (n >= 1e9) return (n / 1e9).toFixed(1) + 'B'
+  if (n >= 1e6) return (n / 1e6).toFixed(1) + 'M'
+  if (n >= 1e3) return (n / 1e3).toFixed(1) + 'K'
+  return n.toLocaleString()
+}
+
+function fmtBytes(b: number): string {
+  if (b >= 1e9) return (b / 1e9).toFixed(1) + ' GB'
+  if (b >= 1e6) return (b / 1e6).toFixed(1) + ' MB'
+  if (b >= 1e3) return (b / 1e3).toFixed(1) + ' KB'
+  return b + ' B'
+}
+
+function fmtRateAxis(r: number): string {
+  if (r >= 1e6) return (r / 1e6).toFixed(1) + 'M'
+  if (r >= 1e3) return (r / 1e3).toFixed(1) + 'K'
+  if (r >= 1) return r.toFixed(0)
+  if (r > 0) return r.toFixed(2)
+  return '0'
+}

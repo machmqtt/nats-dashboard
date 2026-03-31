@@ -1,0 +1,33 @@
+listen: ":8080"
+poll_interval: 5s
+session_secret: "change-me-to-a-random-string"
+data_dir: "./data"
+
+# A default admin user (admin/admin) is created automatically on first startup.
+# Change the password after first login.
+
+environments:
+  - name: production
+    servers:
+      - url: "http://nats-1:8222"
+      - url: "http://nats-2:8222"
+      - url: "http://nats-3:8222"
+    # tls:
+    #   ca_file: "/path/to/ca.pem"
+    #   insecure: false
+
+    # MQTT bridge auto-discovery (enabled by default).
+    # Bridges are found from NATS connection data (connections named machmqtt-bridge / machmqtt-pool-*).
+    # mqtt_discovery:
+    #   enabled: true         # set to false to disable auto-discovery
+    #   admin_ports: [8080]   # ports to probe for bridge admin API
+
+    # Manually configured MQTT bridges (in addition to auto-discovery).
+    # mqtt_bridges:
+    #   - name: mqtt-bridge-1
+    #     url: "http://mqtt-bridge-1:8080"
+    #     bearer_token: "optional-admin-token"
+
+  # - name: staging
+  #   servers:
+  #     - url: "http://nats-staging:8222"

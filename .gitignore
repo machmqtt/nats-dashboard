@@ -1,0 +1,34 @@
+# Build output
+bin/
+*.exe
+
+# Data / runtime
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# Frontend build (embedded in Go binary)
+internal/api/dist/assets/
+
+# Node
+ui/node_modules/
+
+# Test / coverage
+coverage.out
+*.test
+*.prof
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Config with secrets
+config.yaml

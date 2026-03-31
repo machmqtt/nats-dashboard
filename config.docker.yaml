@@ -1,0 +1,11 @@
+listen: ":8080"
+poll_interval: 5s
+session_secret: "docker-dev-secret-change-in-prod"
+data_dir: "/data"
+
+environments:
+  - name: local
+    servers:
+      - url: "http://nats-1:8222"
+      - url: "http://nats-2:8222"
+      - url: "http://nats-3:8222"

@@ -1,0 +1,349 @@
+package store
+
+import (
+	"context"
+	"database/sql"
+	"fmt"
+	"log/slog"
+	"time"
+)
+
+// MetricSample holds one poll's worth of data for metrics storage.
+type MetricSample struct {
+	Timestamp time.Time
+	Env       string
+
+	// Environment-level aggregates.
+	ServerCount     int
+	HealthyCount    int
+	ConnectionCount int
+	InMsgsRate      float64
+	OutMsgsRate     float64
+	InBytesRate     float64
+	OutBytesRate    float64
+	Subscriptions   uint32
+
+	// Per-server metrics.
+	Servers []ServerMetricSample
+
+	// Per-MQTT bridge metrics.
+	MQTTBridges []MQTTBridgeMetricSample
+}
+
+type ServerMetricSample struct {
+	ServerID      string
+	Connections   int
+	InMsgs        int64
+	OutMsgs       int64
+	InBytes       int64
+	OutBytes      int64
+	CPU           float64
+	Mem           int64
+	Subscriptions uint32
+	SlowConsumers int64
+	Routes        int
+	LeafNodes     int
+	InMsgsRate    float64
+	OutMsgsRate   float64
+	InBytesRate   float64
+	OutBytesRate  float64
+	Healthy       bool
+}
+
+type MQTTBridgeMetricSample struct {
+	BridgeID          string
+	ConnectionsActive int64
+	InMsgsRate        float64
+	OutMsgsRate       float64
+	InBytesRate       float64
+	OutBytesRate      float64
+	MsgsRecvQoS0     int64
+	MsgsRecvQoS1     int64
+	MsgsSentQoS0     int64
+	MsgsSentQoS1     int64
+}
+
+// MetricPoint represents a single time-series data point returned by queries.
+type MetricPoint map[string]any
+
+// MetricsWriter buffers metric samples and writes them to SQLite in batches.
+type MetricsWriter struct {
+	db  *sql.DB
+	ch  chan MetricSample
+	log *slog.Logger
+}
+
+// NewMetricsWriter creates a new metrics writer. Call Run() to start the background goroutine.
+func NewMetricsWriter(db *sql.DB, log *slog.Logger) *MetricsWriter {
+	return &MetricsWriter{
+		db:  db,
+		ch:  make(chan MetricSample, 32),
+		log: log,
+	}
+}
+
+// Submit sends a sample to the writer. Non-blocking; drops if buffer is full.
+func (w *MetricsWriter) Submit(s MetricSample) {
+	select {
+	case w.ch <- s:
+	default:
+		// Drop sample — monitoring is best-effort.
+	}
+}
+
+// Run starts the writer goroutine. Blocks until ctx is cancelled.
+func (w *MetricsWriter) Run(ctx context.Context) {
+	cleanup := time.NewTicker(10 * time.Minute)
+	defer cleanup.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case s := <-w.ch:
+			w.writeSample(s)
+		case <-cleanup.C:
+			w.deleteOld()
+		}
+	}
+}
+
+func (w *MetricsWriter) writeSample(s MetricSample) {
+	ts := s.Timestamp.Unix()
+
+	tx, err := w.db.Begin()
+	if err != nil {
+		w.log.Warn("metrics tx begin", "err", err)
+		return
+	}
+	defer tx.Rollback()
+
+	// Insert env-level metrics.
+	_, err = tx.Exec(`INSERT INTO env_metrics (ts, env, server_count, healthy_count, connection_count,
+		in_msgs_rate, out_msgs_rate, in_bytes_rate, out_bytes_rate, subscriptions)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		ts, s.Env, s.ServerCount, s.HealthyCount, s.ConnectionCount,
+		s.InMsgsRate, s.OutMsgsRate, s.InBytesRate, s.OutBytesRate, s.Subscriptions)
+	if err != nil {
+		w.log.Warn("metrics insert env", "err", err)
+		return
+	}
+
+	// Insert per-server metrics.
+	for _, srv := range s.Servers {
+		healthy := 0
+		if srv.Healthy {
+			healthy = 1
+		}
+		_, err = tx.Exec(`INSERT INTO server_metrics (ts, env, server_id,
+			connections, in_msgs, out_msgs, in_bytes, out_bytes,
+			cpu, mem, subscriptions, slow_consumers, routes, leafnodes,
+			in_msgs_rate, out_msgs_rate, in_bytes_rate, out_bytes_rate, healthy)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			ts, s.Env, srv.ServerID,
+			srv.Connections, srv.InMsgs, srv.OutMsgs, srv.InBytes, srv.OutBytes,
+			srv.CPU, srv.Mem, srv.Subscriptions, srv.SlowConsumers, srv.Routes, srv.LeafNodes,
+			srv.InMsgsRate, srv.OutMsgsRate, srv.InBytesRate, srv.OutBytesRate, healthy)
+		if err != nil {
+			w.log.Warn("metrics insert server", "server", srv.ServerID, "err", err)
+		}
+	}
+
+	// Insert per-MQTT bridge metrics.
+	for _, b := range s.MQTTBridges {
+		_, err = tx.Exec(`INSERT INTO mqtt_bridge_metrics (ts, env, bridge_id,
+			connections_active, in_msgs_rate, out_msgs_rate, in_bytes_rate, out_bytes_rate,
+			msgs_recv_qos0, msgs_recv_qos1, msgs_sent_qos0, msgs_sent_qos1)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+			ts, s.Env, b.BridgeID,
+			b.ConnectionsActive, b.InMsgsRate, b.OutMsgsRate, b.InBytesRate, b.OutBytesRate,
+			b.MsgsRecvQoS0, b.MsgsRecvQoS1, b.MsgsSentQoS0, b.MsgsSentQoS1)
+		if err != nil {
+			w.log.Warn("metrics insert mqtt", "bridge", b.BridgeID, "err", err)
+		}
+	}
+
+	if err := tx.Commit(); err != nil {
+		w.log.Warn("metrics tx commit", "err", err)
+	}
+}
+
+func (w *MetricsWriter) deleteOld() {
+	cutoff := time.Now().Add(-24 * time.Hour).Unix()
+	for _, table := range []string{"server_metrics", "env_metrics", "mqtt_bridge_metrics"} {
+		if _, err := w.db.Exec(fmt.Sprintf("DELETE FROM %s WHERE ts < ?", table), cutoff); err != nil {
+			w.log.Warn("metrics cleanup", "table", table, "err", err)
+		}
+	}
+}
+
+// autoStep calculates a step size to return approximately targetPoints data points.
+func autoStep(from, to int64, targetPoints int) int64 {
+	duration := to - from
+	if duration <= 0 {
+		return 5
+	}
+	step := duration / int64(targetPoints)
+	if step < 5 {
+		step = 5
+	}
+	return step
+}
+
+// QueryEnvMetrics returns environment-level time series.
+func (w *MetricsWriter) QueryEnvMetrics(env string, from, to, step int64) ([]MetricPoint, error) {
+	if step <= 0 {
+		step = autoStep(from, to, 200)
+	}
+	rows, err := w.db.Query(`
+		SELECT (ts / ? ) * ? AS bucket,
+			AVG(server_count), AVG(healthy_count), AVG(connection_count),
+			AVG(in_msgs_rate), AVG(out_msgs_rate), AVG(in_bytes_rate), AVG(out_bytes_rate),
+			AVG(subscriptions)
+		FROM env_metrics
+		WHERE env = ? AND ts >= ? AND ts <= ?
+		GROUP BY bucket
+		ORDER BY bucket`,
+		step, step, env, from, to)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []MetricPoint
+	for rows.Next() {
+		var ts int64
+		var serverCount, healthyCount, connCount float64
+		var inMsgsRate, outMsgsRate, inBytesRate, outBytesRate float64
+		var subs float64
+		if err := rows.Scan(&ts, &serverCount, &healthyCount, &connCount,
+			&inMsgsRate, &outMsgsRate, &inBytesRate, &outBytesRate, &subs); err != nil {
+			return nil, err
+		}
+		points = append(points, MetricPoint{
+			"ts":               ts,
+			"server_count":     serverCount,
+			"healthy_count":    healthyCount,
+			"connection_count": connCount,
+			"in_msgs_rate":     inMsgsRate,
+			"out_msgs_rate":    outMsgsRate,
+			"in_bytes_rate":    inBytesRate,
+			"out_bytes_rate":   outBytesRate,
+			"subscriptions":    subs,
+		})
+	}
+	return points, rows.Err()
+}
+
+// QueryServerMetrics returns per-server time series.
+func (w *MetricsWriter) QueryServerMetrics(env, serverID string, from, to, step int64) ([]MetricPoint, error) {
+	if step <= 0 {
+		step = autoStep(from, to, 200)
+	}
+
+	query := `
+		SELECT (ts / ? ) * ? AS bucket, server_id,
+			AVG(connections), AVG(cpu), AVG(mem),
+			AVG(in_msgs_rate), AVG(out_msgs_rate), AVG(in_bytes_rate), AVG(out_bytes_rate),
+			AVG(subscriptions), AVG(slow_consumers)
+		FROM server_metrics
+		WHERE env = ? AND ts >= ? AND ts <= ?`
+	args := []any{step, step, env, from, to}
+
+	if serverID != "" {
+		query += " AND server_id = ?"
+		args = append(args, serverID)
+	}
+
+	query += " GROUP BY bucket, server_id ORDER BY bucket"
+
+	rows, err := w.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []MetricPoint
+	for rows.Next() {
+		var ts int64
+		var sid string
+		var conns, cpu, mem float64
+		var inMR, outMR, inBR, outBR float64
+		var subs, slowC float64
+		if err := rows.Scan(&ts, &sid, &conns, &cpu, &mem,
+			&inMR, &outMR, &inBR, &outBR, &subs, &slowC); err != nil {
+			return nil, err
+		}
+		points = append(points, MetricPoint{
+			"ts":             ts,
+			"server_id":      sid,
+			"connections":    conns,
+			"cpu":            cpu,
+			"mem":            mem,
+			"in_msgs_rate":   inMR,
+			"out_msgs_rate":  outMR,
+			"in_bytes_rate":  inBR,
+			"out_bytes_rate": outBR,
+			"subscriptions":  subs,
+			"slow_consumers": slowC,
+		})
+	}
+	return points, rows.Err()
+}
+
+// QueryMQTTMetrics returns per-bridge time series.
+func (w *MetricsWriter) QueryMQTTMetrics(env, bridgeID string, from, to, step int64) ([]MetricPoint, error) {
+	if step <= 0 {
+		step = autoStep(from, to, 200)
+	}
+
+	query := `
+		SELECT (ts / ? ) * ? AS bucket, bridge_id,
+			AVG(connections_active),
+			AVG(in_msgs_rate), AVG(out_msgs_rate), AVG(in_bytes_rate), AVG(out_bytes_rate),
+			AVG(msgs_recv_qos0), AVG(msgs_recv_qos1), AVG(msgs_sent_qos0), AVG(msgs_sent_qos1)
+		FROM mqtt_bridge_metrics
+		WHERE env = ? AND ts >= ? AND ts <= ?`
+	args := []any{step, step, env, from, to}
+
+	if bridgeID != "" {
+		query += " AND bridge_id = ?"
+		args = append(args, bridgeID)
+	}
+
+	query += " GROUP BY bucket, bridge_id ORDER BY bucket"
+
+	rows, err := w.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var points []MetricPoint
+	for rows.Next() {
+		var ts int64
+		var bid string
+		var connActive float64
+		var inMR, outMR, inBR, outBR float64
+		var rQ0, rQ1, sQ0, sQ1 float64
+		if err := rows.Scan(&ts, &bid, &connActive,
+			&inMR, &outMR, &inBR, &outBR,
+			&rQ0, &rQ1, &sQ0, &sQ1); err != nil {
+			return nil, err
+		}
+		points = append(points, MetricPoint{
+			"ts":                ts,
+			"bridge_id":         bid,
+			"connections_active": connActive,
+			"in_msgs_rate":      inMR,
+			"out_msgs_rate":     outMR,
+			"in_bytes_rate":     inBR,
+			"out_bytes_rate":    outBR,
+			"msgs_recv_qos0":   rQ0,
+			"msgs_recv_qos1":   rQ1,
+			"msgs_sent_qos0":   sQ0,
+			"msgs_sent_qos1":   sQ1,
+		})
+	}
+	return points, rows.Err()
+}
