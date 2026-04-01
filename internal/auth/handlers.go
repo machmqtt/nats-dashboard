@@ -9,6 +9,11 @@ import (
 )
 
 func (a *Auth) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	if !a.loginLimiter.Allow(clientIP(r)) {
+		http.Error(w, `{"error":"too many login attempts, try again later"}`, http.StatusTooManyRequests)
+		return
+	}
+
 	var req struct {
 		Username string `json:"username"`
 		Password string `json:"password"`
@@ -80,7 +85,7 @@ func (a *Auth) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := a.store.ChangePassword(id, req.OldPassword, req.NewPassword); err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		http.Error(w, `{"error":"failed to change password"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -121,7 +126,7 @@ func (a *Auth) HandleCreateUser(w http.ResponseWriter, r *http.Request) {
 
 	user, err := a.store.CreateUser(req.Username, req.Password, req.Role)
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadRequest)
+		http.Error(w, `{"error":"failed to create user"}`, http.StatusBadRequest)
 		return
 	}
 
@@ -146,7 +151,7 @@ func (a *Auth) HandleDeleteUser(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := a.store.DeleteUser(id); err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusNotFound)
+		http.Error(w, `{"error":"failed to delete user"}`, http.StatusBadRequest)
 		return
 	}
 

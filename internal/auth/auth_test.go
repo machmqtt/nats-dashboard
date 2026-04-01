@@ -15,7 +15,7 @@ func testAuth(t *testing.T) (*Auth, *store.Store) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { s.Close() })
-	return New(s, "test-secret-key"), s
+	return New(s, "test-secret-key", false), s
 }
 
 func TestIssueAndValidate(t *testing.T) {

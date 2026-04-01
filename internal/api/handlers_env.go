@@ -95,11 +95,8 @@ func (s *Server) handleVarz(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleConnz(w http.ResponseWriter, r *http.Request) {
 	env := r.PathValue("env")
 	q := r.URL.Query()
-	limit, _ := strconv.Atoi(q.Get("limit"))
-	if limit <= 0 {
-		limit = 50
-	}
-	offset, _ := strconv.Atoi(q.Get("offset"))
+	limit := clampInt(q.Get("limit"), 50, 10000)
+	offset := clampInt(q.Get("offset"), 0, 100000)
 	acc := q.Get("acc")
 	state := q.Get("state")
 	filterSubject := q.Get("filter_subject")
@@ -222,6 +219,7 @@ var subsDetailCacheData = make(map[string]*struct {
 })
 
 const subsCacheTTL = 15 * time.Second
+const subsCacheMaxEntries = 50
 
 func (s *Server) getSubsRows(ctx context.Context, env string) []subRow {
 	subsDetailCacheMu.Lock()
@@ -309,6 +307,21 @@ func (s *Server) getSubsRows(ctx context.Context, env string) []subRow {
 		rows      []subRow
 		fetchedAt time.Time
 	}{rows: all, fetchedAt: time.Now()}
+
+	// Evict stale entries and enforce max cache size.
+	if len(subsDetailCacheData) > subsCacheMaxEntries {
+		var oldestKey string
+		var oldestTime time.Time
+		for k, v := range subsDetailCacheData {
+			if oldestKey == "" || v.fetchedAt.Before(oldestTime) {
+				oldestKey = k
+				oldestTime = v.fetchedAt
+			}
+		}
+		if oldestKey != "" {
+			delete(subsDetailCacheData, oldestKey)
+		}
+	}
 	subsDetailCacheMu.Unlock()
 
 	return all
@@ -317,11 +330,8 @@ func (s *Server) getSubsRows(ctx context.Context, env string) []subRow {
 func (s *Server) handleSubsDetail(w http.ResponseWriter, r *http.Request) {
 	env := r.PathValue("env")
 	q := r.URL.Query()
-	limit, _ := strconv.Atoi(q.Get("limit"))
-	if limit <= 0 {
-		limit = 100
-	}
-	offset, _ := strconv.Atoi(q.Get("offset"))
+	limit := clampInt(q.Get("limit"), 100, 10000)
+	offset := clampInt(q.Get("offset"), 0, 100000)
 	filterSubject := q.Get("subject")
 	filterAccount := q.Get("account")
 	filterServer := q.Get("server")
@@ -510,6 +520,25 @@ func (s *Server) envSnapshot(w http.ResponseWriter, r *http.Request) *collector.
 		return nil
 	}
 	return snap
+}
+
+// clampInt parses a query parameter as an integer, returning defaultVal if
+// empty/invalid and capping at maxVal to prevent resource exhaustion.
+func clampInt(s string, defaultVal, maxVal int) int {
+	if s == "" {
+		return defaultVal
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 0 {
+		return defaultVal
+	}
+	if n == 0 {
+		return defaultVal
+	}
+	if n > maxVal {
+		return maxVal
+	}
+	return n
 }
 
 func writeJSON(w http.ResponseWriter, v any) {

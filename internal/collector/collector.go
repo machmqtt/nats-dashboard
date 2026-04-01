@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"net/url"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/machmqtt/nats-dashboard/internal/config"
@@ -26,8 +27,9 @@ type Collector struct {
 	tick     uint64
 
 	// Cached MQTT bridge discovery results.
-	mqttMu      sync.RWMutex
-	mqttBridges []MQTTBridgeInstance
+	mqttMu          sync.RWMutex
+	mqttBridges     []MQTTBridgeInstance
+	mqttDiscovering atomic.Bool
 }
 
 func newCollector(env config.Environment, fetcher *Fetcher, interval time.Duration, log *slog.Logger, db *store.Store) *Collector {
@@ -151,9 +153,12 @@ func (c *Collector) poll(ctx context.Context, slow bool) {
 	c.snapshot = snap
 	c.mu.Unlock()
 
-	// Run MQTT bridge discovery on slow polls.
-	if slow && c.env.MQTTDiscoveryEnabled() {
-		go c.discoverMQTTBridges(ctx)
+	// Run MQTT bridge discovery on slow polls (skip if one is already running).
+	if slow && c.env.MQTTDiscoveryEnabled() && c.mqttDiscovering.CompareAndSwap(false, true) {
+		go func() {
+			defer c.mqttDiscovering.Store(false)
+			c.discoverMQTTBridges(ctx)
+		}()
 	}
 }
 

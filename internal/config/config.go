@@ -12,6 +12,7 @@ type Config struct {
 	Listen        string        `yaml:"listen"`
 	PollInterval  time.Duration `yaml:"poll_interval"`
 	SessionSecret string        `yaml:"session_secret"`
+	SecureCookies bool          `yaml:"secure_cookies"`
 	DataDir       string        `yaml:"data_dir"`
 	Environments  []Environment `yaml:"environments"`
 }
@@ -78,6 +79,9 @@ func Load(path string) (*Config, error) {
 
 	if cfg.SessionSecret == "" {
 		return nil, fmt.Errorf("session_secret is required")
+	}
+	if len(cfg.SessionSecret) < 32 {
+		return nil, fmt.Errorf("session_secret must be at least 32 characters")
 	}
 	if len(cfg.Environments) == 0 {
 		return nil, fmt.Errorf("at least one environment is required")

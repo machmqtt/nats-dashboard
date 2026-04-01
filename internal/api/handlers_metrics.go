@@ -14,7 +14,7 @@ func (s *Server) handleEnvMetrics(w http.ResponseWriter, r *http.Request) {
 	env := r.PathValue("env")
 	from, to, step := parseTimeRange(r)
 
-	points, err := s.metrics.QueryEnvMetrics(env, from, to, step)
+	points, err := s.metrics.QueryEnvMetrics(r.Context(), env, from, to, step)
 	if err != nil {
 		http.Error(w, `{"error":"query failed"}`, http.StatusInternalServerError)
 		return
@@ -31,7 +31,7 @@ func (s *Server) handleServerMetrics(w http.ResponseWriter, r *http.Request) {
 	serverID := r.URL.Query().Get("server_id")
 	from, to, step := parseTimeRange(r)
 
-	points, err := s.metrics.QueryServerMetrics(env, serverID, from, to, step)
+	points, err := s.metrics.QueryServerMetrics(r.Context(), env, serverID, from, to, step)
 	if err != nil {
 		http.Error(w, `{"error":"query failed"}`, http.StatusInternalServerError)
 		return
@@ -48,7 +48,7 @@ func (s *Server) handleMQTTBridgeMetrics(w http.ResponseWriter, r *http.Request)
 	bridgeID := r.URL.Query().Get("bridge_id")
 	from, to, step := parseTimeRange(r)
 
-	points, err := s.metrics.QueryMQTTMetrics(env, bridgeID, from, to, step)
+	points, err := s.metrics.QueryMQTTMetrics(r.Context(), env, bridgeID, from, to, step)
 	if err != nil {
 		http.Error(w, `{"error":"query failed"}`, http.StatusInternalServerError)
 		return
@@ -59,20 +59,21 @@ func (s *Server) handleMQTTBridgeMetrics(w http.ResponseWriter, r *http.Request)
 func parseTimeRange(r *http.Request) (from, to, step int64) {
 	now := time.Now().Unix()
 	to = now
-	from = now - 3600 // default 1 hour
+	from = now - 3600           // default 1 hour
+	minFrom := now - 30*24*3600 // max 30 days of history
 
 	if v := r.URL.Query().Get("from"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n >= minFrom && n <= now {
 			from = n
 		}
 	}
 	if v := r.URL.Query().Get("to"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n >= from && n <= now+60 {
 			to = n
 		}
 	}
 	if v := r.URL.Query().Get("step"); v != "" {
-		if n, err := strconv.ParseInt(v, 10, 64); err == nil {
+		if n, err := strconv.ParseInt(v, 10, 64); err == nil && n >= 1 && n <= 86400 {
 			step = n
 		}
 	}

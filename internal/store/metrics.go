@@ -191,11 +191,11 @@ func autoStep(from, to int64, targetPoints int) int64 {
 }
 
 // QueryEnvMetrics returns environment-level time series.
-func (w *MetricsWriter) QueryEnvMetrics(env string, from, to, step int64) ([]MetricPoint, error) {
+func (w *MetricsWriter) QueryEnvMetrics(ctx context.Context, env string, from, to, step int64) ([]MetricPoint, error) {
 	if step <= 0 {
 		step = autoStep(from, to, 200)
 	}
-	rows, err := w.db.Query(`
+	rows, err := w.db.QueryContext(ctx, `
 		SELECT (ts / ? ) * ? AS bucket,
 			AVG(server_count), AVG(healthy_count), AVG(connection_count),
 			AVG(in_msgs_rate), AVG(out_msgs_rate), AVG(in_bytes_rate), AVG(out_bytes_rate),
@@ -236,7 +236,7 @@ func (w *MetricsWriter) QueryEnvMetrics(env string, from, to, step int64) ([]Met
 }
 
 // QueryServerMetrics returns per-server time series.
-func (w *MetricsWriter) QueryServerMetrics(env, serverID string, from, to, step int64) ([]MetricPoint, error) {
+func (w *MetricsWriter) QueryServerMetrics(ctx context.Context, env, serverID string, from, to, step int64) ([]MetricPoint, error) {
 	if step <= 0 {
 		step = autoStep(from, to, 200)
 	}
@@ -257,7 +257,7 @@ func (w *MetricsWriter) QueryServerMetrics(env, serverID string, from, to, step 
 
 	query += " GROUP BY bucket, server_id ORDER BY bucket"
 
-	rows, err := w.db.Query(query, args...)
+	rows, err := w.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -292,7 +292,7 @@ func (w *MetricsWriter) QueryServerMetrics(env, serverID string, from, to, step 
 }
 
 // QueryMQTTMetrics returns per-bridge time series.
-func (w *MetricsWriter) QueryMQTTMetrics(env, bridgeID string, from, to, step int64) ([]MetricPoint, error) {
+func (w *MetricsWriter) QueryMQTTMetrics(ctx context.Context, env, bridgeID string, from, to, step int64) ([]MetricPoint, error) {
 	if step <= 0 {
 		step = autoStep(from, to, 200)
 	}
@@ -313,7 +313,7 @@ func (w *MetricsWriter) QueryMQTTMetrics(env, bridgeID string, from, to, step in
 
 	query += " GROUP BY bucket, bridge_id ORDER BY bucket"
 
-	rows, err := w.db.Query(query, args...)
+	rows, err := w.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}

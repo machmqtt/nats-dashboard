@@ -144,6 +144,9 @@ func DiscoverMQTTBridges(ctx context.Context, snap, prev *Snapshot, adminPorts [
 	var wg sync.WaitGroup
 	var instances []MQTTBridgeInstance
 
+	// Limit concurrent discovery probes to avoid resource exhaustion.
+	sem := make(chan struct{}, 10)
+
 	for key, g := range groups {
 		pg := prevGroups[key]
 		var prevIn, prevOut, prevInB, prevOutB int64
@@ -173,6 +176,12 @@ func DiscoverMQTTBridges(ctx context.Context, snap, prev *Snapshot, adminPorts [
 		wg.Add(1)
 		go func(inst MQTTBridgeInstance) {
 			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				return
+			}
 			for _, port := range adminPorts {
 				host := inst.IP
 				if net.ParseIP(host) != nil && strings.Contains(host, ":") {

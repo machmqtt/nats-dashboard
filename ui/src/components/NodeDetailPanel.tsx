@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { X } from 'lucide-react'
 import type { TopologyNode } from '../store/store'
 import { Link } from 'react-router-dom'
@@ -7,7 +8,7 @@ interface Props {
   onClose: () => void
 }
 
-export function NodeDetailPanel({ node, onClose }: Props) {
+export const NodeDetailPanel = memo(function NodeDetailPanel({ node, onClose }: Props) {
   return (
     <div className="fixed top-0 right-0 h-screen w-[400px] bg-white dark:bg-gray-800 shadow-xl border-l border-gray-200 dark:border-gray-700 z-50 overflow-y-auto">
       <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
@@ -36,7 +37,7 @@ export function NodeDetailPanel({ node, onClose }: Props) {
       </div>
     </div>
   )
-}
+})
 
 function InfoItem({ label, value }: { label: string; value: string }) {
   return (

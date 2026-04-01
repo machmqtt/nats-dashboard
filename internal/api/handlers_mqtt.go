@@ -3,7 +3,6 @@ package api
 import (
 	"net/http"
 	"sort"
-	"strconv"
 
 	"github.com/machmqtt/nats-dashboard/internal/collector"
 	"github.com/machmqtt/nats-dashboard/internal/config"
@@ -84,11 +83,8 @@ func (s *Server) handleMQTTConnz(w http.ResponseWriter, r *http.Request) {
 	env := r.PathValue("env")
 	bridgeName := r.PathValue("bridge")
 	q := r.URL.Query()
-	limit, _ := strconv.Atoi(q.Get("limit"))
-	if limit <= 0 {
-		limit = 50
-	}
-	offset, _ := strconv.Atoi(q.Get("offset"))
+	limit := clampInt(q.Get("limit"), 50, 10000)
+	offset := clampInt(q.Get("offset"), 0, 100000)
 
 	bridge := s.findBridge(env, bridgeName)
 	if bridge == nil {
@@ -125,7 +121,8 @@ func (s *Server) handleMQTTClient(w http.ResponseWriter, r *http.Request) {
 	f := collector.NewMQTTBridgeFetcher(bridge.URL, bridge.Name, bridge.BearerToken)
 	connz, err := f.FetchConnzClient(r.Context(), clientID)
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadGateway)
+		s.log.Warn("mqtt bridge request failed", "err", err)
+		http.Error(w, `{"error":"bridge request failed"}`, http.StatusBadGateway)
 		return
 	}
 	if len(connz.Connections) == 0 {
@@ -148,7 +145,8 @@ func (s *Server) handleMQTTDiag(w http.ResponseWriter, r *http.Request) {
 	f := collector.NewMQTTBridgeFetcher(bridge.URL, bridge.Name, bridge.BearerToken)
 	diag, err := f.FetchDiagNATS(r.Context())
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadGateway)
+		s.log.Warn("mqtt bridge request failed", "err", err)
+		http.Error(w, `{"error":"bridge request failed"}`, http.StatusBadGateway)
 		return
 	}
 	writeJSON(w, diag)
@@ -167,7 +165,8 @@ func (s *Server) handleMQTTPool(w http.ResponseWriter, r *http.Request) {
 	f := collector.NewMQTTBridgeFetcher(bridge.URL, bridge.Name, bridge.BearerToken)
 	pool, err := f.FetchPool(r.Context())
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadGateway)
+		s.log.Warn("mqtt bridge request failed", "err", err)
+		http.Error(w, `{"error":"bridge request failed"}`, http.StatusBadGateway)
 		return
 	}
 	writeJSON(w, pool)
@@ -186,7 +185,8 @@ func (s *Server) handleMQTTBridgeDiag(w http.ResponseWriter, r *http.Request) {
 	f := collector.NewMQTTBridgeFetcher(bridge.URL, bridge.Name, bridge.BearerToken)
 	diag, err := f.FetchDiag(r.Context())
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadGateway)
+		s.log.Warn("mqtt bridge request failed", "err", err)
+		http.Error(w, `{"error":"bridge request failed"}`, http.StatusBadGateway)
 		return
 	}
 	writeJSON(w, diag)
@@ -205,7 +205,8 @@ func (s *Server) handleMQTTLicense(w http.ResponseWriter, r *http.Request) {
 	f := collector.NewMQTTBridgeFetcher(bridge.URL, bridge.Name, bridge.BearerToken)
 	license, err := f.FetchLicense(r.Context())
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadGateway)
+		s.log.Warn("mqtt bridge request failed", "err", err)
+		http.Error(w, `{"error":"bridge request failed"}`, http.StatusBadGateway)
 		return
 	}
 	writeJSON(w, license)
@@ -224,7 +225,8 @@ func (s *Server) handleMQTTMetrics(w http.ResponseWriter, r *http.Request) {
 	f := collector.NewMQTTBridgeFetcher(bridge.URL, bridge.Name, bridge.BearerToken)
 	metrics, err := f.FetchMetrics(r.Context())
 	if err != nil {
-		http.Error(w, `{"error":"`+err.Error()+`"}`, http.StatusBadGateway)
+		s.log.Warn("mqtt bridge request failed", "err", err)
+		http.Error(w, `{"error":"bridge request failed"}`, http.StatusBadGateway)
 		return
 	}
 	writeJSON(w, metrics)

@@ -37,8 +37,14 @@ jobs:
       - name: Go test
         run: go test -count=1 -timeout 120s ./...
 
+      - name: Go vulnerability check
+        run: go install golang.org/x/vuln/cmd/govulncheck@latest && govulncheck ./...
+
       - name: Install frontend dependencies
         run: cd ui && npm ci
+
+      - name: NPM audit
+        run: cd ui && npm audit --audit-level=moderate
 
       - name: TypeScript check
         run: cd ui && npx tsc --noEmit

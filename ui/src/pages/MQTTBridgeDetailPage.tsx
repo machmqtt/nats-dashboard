@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 import { useParams, Link } from 'react-router-dom'
 import { useStore } from '../store/store'
 import { TableSkeleton } from '../components/Skeleton'
@@ -36,11 +37,11 @@ export function MQTTBridgeDetailPage() {
     const b = encodeURIComponent(bridge)
     const base = `/api/environments/${activeEnv}/mqtt/${b}`
     const results = await Promise.allSettled([
-      fetch(`${base}/diag`).then(r => r.ok ? r.json() : null),
-      fetch(`${base}/metrics`).then(r => r.ok ? r.json() : null),
-      fetch(`${base}/pool`).then(r => r.ok ? r.json() : null),
-      fetch(`${base}/license`).then(r => r.ok ? r.json() : null),
-      fetch(`${base}/diag/config`).then(r => r.ok ? r.json() : null),
+      fetchWithTimeout(`${base}/diag`).then(r => r.ok ? r.json() : null),
+      fetchWithTimeout(`${base}/metrics`).then(r => r.ok ? r.json() : null),
+      fetchWithTimeout(`${base}/pool`).then(r => r.ok ? r.json() : null),
+      fetchWithTimeout(`${base}/license`).then(r => r.ok ? r.json() : null),
+      fetchWithTimeout(`${base}/diag/config`).then(r => r.ok ? r.json() : null),
     ])
     setNats(results[0].status === 'fulfilled' ? results[0].value : null)
     setMetrics(results[1].status === 'fulfilled' ? results[1].value : null)

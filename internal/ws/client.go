@@ -3,6 +3,7 @@ package ws
 import (
 	"encoding/json"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -30,8 +31,21 @@ type Client struct {
 	hub  *Hub
 	conn *websocket.Conn
 	send chan Message
+	mu   sync.RWMutex
 	env  string
 	log  *slog.Logger
+}
+
+func (c *Client) Env() string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.env
+}
+
+func (c *Client) setEnv(env string) {
+	c.mu.Lock()
+	c.env = env
+	c.mu.Unlock()
 }
 
 func NewClient(hub *Hub, conn *websocket.Conn, log *slog.Logger) *Client {
@@ -73,7 +87,7 @@ func (c *Client) readPump() {
 
 		var sub subscribeMsg
 		if json.Unmarshal(msg, &sub) == nil && sub.Subscribe != "" {
-			c.env = sub.Subscribe
+			c.setEnv(sub.Subscribe)
 		}
 	}
 }

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 import { Link } from 'react-router-dom'
 import {
   createColumnHelper,
@@ -87,7 +88,7 @@ export function MQTTAllConnectionsPage() {
     if (isInitial) setLoading(true)
 
     try {
-      const bridgeRes = await fetch(`/api/environments/${activeEnv}/mqtt/bridges`)
+      const bridgeRes = await fetchWithTimeout(`/api/environments/${activeEnv}/mqtt/bridges`)
       if (!bridgeRes.ok) { setLoading(false); return }
       const bridgeData = await bridgeRes.json()
       const bridges: BridgeInstance[] = bridgeData.bridges || []
@@ -100,7 +101,7 @@ export function MQTTAllConnectionsPage() {
       const results = await Promise.allSettled(
         reachable.map(async (b) => {
           const name = b.configured_name || b.status?.name || `mqtt@${b.ip}`
-          const res = await fetch(`/api/environments/${activeEnv}/mqtt/${encodeURIComponent(name)}/connz?limit=10000&offset=0`)
+          const res = await fetchWithTimeout(`/api/environments/${activeEnv}/mqtt/${encodeURIComponent(name)}/connz?limit=1000&offset=0`)
           if (!res.ok) return []
           const data = await res.json()
           if (data.error) return []

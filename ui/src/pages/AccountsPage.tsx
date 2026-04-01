@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 import { useStore } from '../store/store'
 import { TableSkeleton } from '../components/Skeleton'
 import { ChevronDown, ChevronRight } from 'lucide-react'
@@ -63,7 +64,7 @@ export function AccountsPage() {
     if (!activeEnv) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/environments/${activeEnv}/accountz`)
+      const res = await fetchWithTimeout(`/api/environments/${activeEnv}/accountz`)
       if (res.ok) setData(await res.json())
     } catch { /* */ }
     setLoading(false)
@@ -91,7 +92,7 @@ export function AccountsPage() {
     setExpanded(acc); setDetail(null); setDrilldown(null); setDrillData(null)
     setDetailLoading(true)
     try {
-      const res = await fetch(`/api/environments/${activeEnv}/accountz/${encodeURIComponent(acc)}`)
+      const res = await fetchWithTimeout(`/api/environments/${activeEnv}/accountz/${encodeURIComponent(acc)}`)
       if (res.ok) setDetail(await res.json())
     } catch { /* */ }
     setDetailLoading(false)
@@ -102,10 +103,10 @@ export function AccountsPage() {
     setDrilldown(type); setDrillData(null); setDrillLoading(true)
     try {
       if (type === 'connections') {
-        const res = await fetch(`/api/environments/${activeEnv}/connz?limit=1000&acc=${encodeURIComponent(expanded!)}`)
+        const res = await fetchWithTimeout(`/api/environments/${activeEnv}/connz?limit=1000&acc=${encodeURIComponent(expanded!)}`)
         if (res.ok) setDrillData(await res.json())
       } else if (type === 'leafs') {
-        const res = await fetch(`/api/environments/${activeEnv}/leafz`)
+        const res = await fetchWithTimeout(`/api/environments/${activeEnv}/leafz`)
         if (res.ok) {
           const all = await res.json()
           const leafs: LeafInfo[] = []
@@ -118,7 +119,7 @@ export function AccountsPage() {
           setDrillData({ leafs })
         }
       } else if (type === 'subs') {
-        const res = await fetch(`/api/environments/${activeEnv}/subsz/detail?limit=1000&account=${encodeURIComponent(expanded!)}`)
+        const res = await fetchWithTimeout(`/api/environments/${activeEnv}/subsz/detail?limit=1000&account=${encodeURIComponent(expanded!)}`)
         if (res.ok) setDrillData(await res.json())
       }
     } catch { /* */ }

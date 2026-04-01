@@ -1,10 +1,11 @@
 listen: ":8080"
 poll_interval: 5s
-session_secret: "change-me-to-a-random-string"
+session_secret: "change-me-to-a-random-string-at-least-32-chars"
+# secure_cookies: true  # Set to true when serving over HTTPS
 data_dir: "./data"
 
 # A default admin user (admin/admin) is created automatically on first startup.
-# Change the password after first login.
+# You will be required to change the password on first login.
 
 environments:
   - name: production

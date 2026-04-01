@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 import { useParams, Link } from 'react-router-dom'
 import {
   createColumnHelper,
@@ -75,7 +76,7 @@ export function MQTTConnectionsPage() {
     const isInitial = !data
     if (isInitial) setLoading(true)
     try {
-      const res = await fetch(`/api/environments/${activeEnv}/mqtt/${encodeURIComponent(bridge)}/connz?limit=${pageSize}&offset=${offset}`)
+      const res = await fetchWithTimeout(`/api/environments/${activeEnv}/mqtt/${encodeURIComponent(bridge)}/connz?limit=${pageSize}&offset=${offset}`)
       if (res.ok) {
         const json = await res.json()
         if (json.error) {

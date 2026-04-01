@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 import {
   createColumnHelper,
   flexRender,
@@ -95,7 +96,7 @@ export function SubscriptionsPage() {
   const fetchSummary = useCallback(async () => {
     if (!activeEnv) return
     try {
-      const res = await fetch(`/api/environments/${activeEnv}/subsz`)
+      const res = await fetchWithTimeout(`/api/environments/${activeEnv}/subsz`)
       if (res.ok) setSummary(await res.json())
     } catch { /* ignore */ }
     setSummaryLoading(false)

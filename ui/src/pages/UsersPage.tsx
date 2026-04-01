@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 import { useStore } from '../store/store'
 import { TableSkeleton } from '../components/Skeleton'
 import { Trash2, Key } from 'lucide-react'
@@ -29,7 +30,7 @@ export function UsersPage() {
   const fetchUsers = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/admin/users')
+      const res = await fetchWithTimeout('/api/admin/users')
       if (res.ok) {
         const data = await res.json()
         setUsers(data.users || [])
@@ -49,7 +50,7 @@ export function UsersPage() {
     }
     setCreating(true)
     try {
-      const res = await fetch('/api/admin/users', {
+      const res = await fetchWithTimeout('/api/admin/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username: newUsername, password: newPassword, role: newRole }),
@@ -69,7 +70,7 @@ export function UsersPage() {
   const handleDelete = async (user: ManagedUser) => {
     if (!confirm(`Delete user "${user.username}"?`)) return
     try {
-      const res = await fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' })
+      const res = await fetchWithTimeout(`/api/admin/users/${user.id}`, { method: 'DELETE' })
       if (res.ok) {
         addToast(`User "${user.username}" deleted`, 'success')
         fetchUsers()
@@ -83,7 +84,7 @@ export function UsersPage() {
   const handleChangePassword = async () => {
     if (!changePwUser || !oldPw || !newPw) return
     try {
-      const res = await fetch(`/api/users/${changePwUser.id}/password`, {
+      const res = await fetchWithTimeout(`/api/users/${changePwUser.id}/password`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ old_password: oldPw, new_password: newPw }),

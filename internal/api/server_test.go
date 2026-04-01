@@ -25,7 +25,7 @@ func setupTestServer(t *testing.T) (*Server, *auth.Auth, string) {
 	t.Cleanup(func() { s.Close() })
 
 	u, _ := s.CreateUser("admin", "pass", store.RoleAdmin)
-	a := auth.New(s, "test-secret")
+	a := auth.New(s, "test-secret", false)
 	token, _ := a.IssueToken(u)
 	log := slog.New(slog.NewTextHandler(nil, nil))
 
@@ -234,5 +234,71 @@ func TestViewerCannotAccessAdmin(t *testing.T) {
 
 	if w.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want 403", w.Code)
+	}
+}
+
+func TestDefaultAdminMustChangePassword(t *testing.T) {
+	// Use EnsureDefaultAdmin (the real startup path) instead of CreateUser.
+	s, err := store.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { s.Close() })
+
+	_, err = s.EnsureDefaultAdmin()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	a := auth.New(s, "test-secret", false)
+	log := slog.New(slog.NewTextHandler(nil, nil))
+	cfg := &config.Config{
+		PollInterval: 5e9,
+		Environments: []config.Environment{
+			{Name: "test", Servers: []config.Server{{URL: "http://localhost:9999"}}},
+		},
+	}
+	hub := ws.NewHub(log)
+	mgr, _ := collector.NewManager(cfg, nil, log, s)
+	srv := NewServer(a, mgr, hub, log, "test", cfg, nil, s)
+
+	// Login as default admin.
+	req := httptest.NewRequest("POST", "/api/login", strings.NewReader(`{"username":"admin","password":"admin"}`))
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("login status = %d, want 200, body: %s", w.Code, w.Body.String())
+	}
+
+	var loginResp map[string]any
+	json.NewDecoder(w.Body).Decode(&loginResp)
+
+	mcp, ok := loginResp["must_change_password"]
+	if !ok {
+		t.Fatalf("login response missing must_change_password field, got: %v", loginResp)
+	}
+	if mcp != true {
+		t.Errorf("login must_change_password = %v, want true", mcp)
+	}
+
+	// Also check /api/me returns the flag.
+	cookies := w.Result().Cookies()
+	meReq := httptest.NewRequest("GET", "/api/me", nil)
+	for _, c := range cookies {
+		meReq.AddCookie(c)
+	}
+	w2 := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(w2, meReq)
+
+	if w2.Code != http.StatusOK {
+		t.Fatalf("me status = %d, want 200", w2.Code)
+	}
+
+	var meResp map[string]any
+	json.NewDecoder(w2.Body).Decode(&meResp)
+	if meResp["must_change_password"] != true {
+		t.Errorf("me must_change_password = %v, want true", meResp["must_change_password"])
 	}
 }

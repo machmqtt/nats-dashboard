@@ -19,7 +19,7 @@ export function TopologyPage() {
     )
   }
 
-  if (topology.nodes.length === 0) {
+  if (!topology.nodes || topology.nodes.length === 0) {
     return (
       <div>
         <h1 className="text-2xl font-semibold mb-4">Cluster Topology</h1>

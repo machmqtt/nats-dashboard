@@ -37,7 +37,7 @@ func (h *Hub) Broadcast(env string, msgType string, data any) {
 
 	msg := Message{Type: msgType, Env: env, Data: data}
 	for c := range h.clients {
-		if c.env == env {
+		if c.Env() == env {
 			select {
 			case c.send <- msg:
 			default:

@@ -5,6 +5,7 @@ import (
 	"io/fs"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/gorilla/websocket"
@@ -18,8 +19,22 @@ import (
 //go:embed dist/*
 var distFS embed.FS
 
+// checkSameOrigin validates that the Origin header matches the Host header,
+// preventing cross-site WebSocket hijacking attacks.
+func checkSameOrigin(r *http.Request) bool {
+	origin := r.Header.Get("Origin")
+	if origin == "" {
+		return true // non-browser clients don't send Origin
+	}
+	u, err := url.Parse(origin)
+	if err != nil {
+		return false
+	}
+	return strings.EqualFold(u.Host, r.Host)
+}
+
 var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool { return true },
+	CheckOrigin: checkSameOrigin,
 }
 
 type Server struct {
@@ -52,7 +67,7 @@ func NewServer(a *auth.Auth, manager *collector.Manager, hub *ws.Hub, log *slog.
 }
 
 func (s *Server) Handler() http.Handler {
-	return s.mux
+	return securityHeaders(limitBody(s.mux))
 }
 
 func (s *Server) serveSPA() {

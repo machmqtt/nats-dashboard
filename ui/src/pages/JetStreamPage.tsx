@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 import { useStore } from '../store/store'
 import { TableSkeleton, CardSkeleton } from '../components/Skeleton'
 import { ChevronDown, ChevronRight } from 'lucide-react'
@@ -50,8 +51,8 @@ export function JetStreamPage() {
     const run = async () => {
       setLoading(true)
       try {
-        const r = await fetch(`/api/environments/${activeEnv}/jsz`)
-        setData(await r.json())
+        const r = await fetchWithTimeout(`/api/environments/${activeEnv}/jsz`)
+        if (r.ok) setData(await r.json())
       } catch { /* */ }
       setLoading(false)
     }

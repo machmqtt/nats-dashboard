@@ -25,7 +25,10 @@ func NewFetcher(tlsCfg *config.TLSConfig) (*Fetcher, error) {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 
 	if tlsCfg != nil {
-		tc := &tls.Config{InsecureSkipVerify: tlsCfg.Insecure}
+		if tlsCfg.Insecure {
+			fmt.Fprintln(os.Stderr, "WARNING: TLS certificate verification is disabled (insecure: true). This is vulnerable to man-in-the-middle attacks.")
+		}
+		tc := &tls.Config{InsecureSkipVerify: tlsCfg.Insecure, MinVersion: tls.VersionTLS12}
 		if tlsCfg.CAFile != "" {
 			caCert, err := os.ReadFile(tlsCfg.CAFile)
 			if err != nil {

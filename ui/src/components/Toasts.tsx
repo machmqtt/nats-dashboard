@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useStore } from '../store/store'
 import { X } from 'lucide-react'
 
@@ -7,7 +8,7 @@ const colors = {
   success: 'bg-green-500',
 }
 
-export function Toasts() {
+export const Toasts = memo(function Toasts() {
   const { toasts, removeToast } = useStore()
 
   if (toasts.length === 0) return null
@@ -27,4 +28,4 @@ export function Toasts() {
       ))}
     </div>
   )
-}
+})

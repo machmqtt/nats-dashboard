@@ -1,6 +1,6 @@
 listen: ":8080"
 poll_interval: 5s
-session_secret: "docker-dev-secret-change-in-prod"
+session_secret: "docker-dev-secret-change-me-in-production"
 data_dir: "/data"
 
 environments:

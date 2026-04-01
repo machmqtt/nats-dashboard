@@ -56,7 +56,7 @@ func main() {
 		log.Info("created default admin user", "username", defaultUser.Username)
 	}
 
-	a := auth.New(db, cfg.SessionSecret)
+	a := auth.New(db, cfg.SessionSecret, cfg.SecureCookies)
 	hub := ws.NewHub(log)
 
 	metricsWriter := store.NewMetricsWriter(db.DB(), log)
@@ -68,12 +68,12 @@ func main() {
 
 	var manager *collector.Manager
 	manager, err = collector.NewManager(cfg, func(envName string) {
-		hub.Broadcast(envName, "overview", manager.Overview(envName))
+		overview := manager.Overview(envName)
+		hub.Broadcast(envName, "overview", overview)
 		hub.Broadcast(envName, "topology", manager.Topology(envName))
 		hub.Broadcast(envName, "health", manager.Health(envName))
 
 		// Submit metrics sample for time-series storage.
-		overview := manager.Overview(envName)
 		if overview != nil {
 			sample := store.MetricSample{
 				Timestamp:       time.Now(),
@@ -155,8 +155,12 @@ func main() {
 	srv := api.NewServer(a, manager, hub, log, version, cfg, metricsWriter, db)
 
 	httpServer := &http.Server{
-		Addr:    cfg.Listen,
-		Handler: srv.Handler(),
+		Addr:           cfg.Listen,
+		Handler:        srv.Handler(),
+		MaxHeaderBytes: 1 << 20, // 1 MB
+		ReadTimeout:    30 * time.Second,
+		WriteTimeout:   60 * time.Second,
+		IdleTimeout:    120 * time.Second,
 	}
 
 	// Graceful shutdown.

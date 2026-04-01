@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { fetchWithTimeout } from './utils/fetchWithTimeout'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import type { User } from './hooks/useAuth'
@@ -7,6 +8,7 @@ import { useStore } from './store/store'
 import { Shell } from './components/layout/Shell'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { LoginPage } from './pages/LoginPage'
+import { ChangePasswordPage } from './pages/ChangePasswordPage'
 import { OverviewPage } from './pages/OverviewPage'
 import { TopologyPage } from './pages/TopologyPage'
 import { ConnectionsPage } from './pages/ConnectionsPage'
@@ -27,9 +29,10 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
   useWebSocket()
 
   useEffect(() => {
-    fetch('/api/environments')
-      .then((r) => r.json())
+    fetchWithTimeout('/api/environments')
+      .then((r) => r.ok ? r.json() : null)
       .then((data) => {
+        if (!data) return
         const envs: string[] = data.environments || []
         setEnvironments(envs)
         if (envs.length > 0 && !activeEnv) {
@@ -37,9 +40,9 @@ function AuthenticatedApp({ user, onLogout }: { user: User; onLogout: () => void
         }
       })
       .catch(() => {})
-    fetch('/api/version')
-      .then((r) => r.json())
-      .then((d) => setVersion(d.version || 'dev'))
+    fetchWithTimeout('/api/version')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => { if (d) setVersion(d.version || 'dev') })
       .catch(() => {})
   }, [setEnvironments, setActiveEnv, activeEnv])
 
@@ -80,11 +83,19 @@ export default function App() {
     )
   }
 
+  const handlePasswordChanged = () => {
+    window.location.reload()
+  }
+
   return (
     <ErrorBoundary>
       <BrowserRouter>
         {user ? (
-          <AuthenticatedApp user={user} onLogout={logout} />
+          user.must_change_password ? (
+            <ChangePasswordPage userId={user.id} onChanged={handlePasswordChanged} />
+          ) : (
+            <AuthenticatedApp user={user} onLogout={logout} />
+          )
         ) : (
           <Routes>
             <Route path="*" element={<LoginPage onLogin={login} />} />

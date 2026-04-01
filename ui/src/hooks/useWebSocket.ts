@@ -29,10 +29,14 @@ export function useWebSocket() {
         try {
           const msg = JSON.parse(e.data)
           if (msg.env !== activeEnv) return
-          if (msg.type === 'overview') setOverview(msg.data)
-          if (msg.type === 'topology') setTopology(msg.data)
-          if (msg.type === 'health') setHealth(msg.data)
-        } catch { /* ignore */ }
+          // React 18+ batches these automatically, but grouping by
+          // message type makes intent explicit and avoids unnecessary calls.
+          switch (msg.type) {
+            case 'overview': setOverview(msg.data); break
+            case 'topology': setTopology(msg.data); break
+            case 'health': setHealth(msg.data); break
+          }
+        } catch { /* ignore parse errors from malformed messages */ }
       }
 
       ws.onclose = () => {

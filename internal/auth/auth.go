@@ -22,16 +22,20 @@ type Claims struct {
 }
 
 type Auth struct {
-	store     *store.Store
-	secret    []byte
-	cookieTTL time.Duration
+	store         *store.Store
+	secret        []byte
+	cookieTTL     time.Duration
+	secureCookies bool
+	loginLimiter  *LoginRateLimiter
 }
 
-func New(s *store.Store, secret string) *Auth {
+func New(s *store.Store, secret string, secureCookies bool) *Auth {
 	return &Auth{
-		store:     s,
-		secret:    []byte(secret),
-		cookieTTL: 24 * time.Hour,
+		store:         s,
+		secret:        []byte(secret),
+		cookieTTL:     24 * time.Hour,
+		secureCookies: secureCookies,
+		loginLimiter:  NewLoginRateLimiter(10, 5*time.Minute),
 	}
 }
 
@@ -73,6 +77,7 @@ func (a *Auth) SetSessionCookie(w http.ResponseWriter, token string) {
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   a.secureCookies,
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   int(a.cookieTTL.Seconds()),
 	})
@@ -84,6 +89,7 @@ func (a *Auth) ClearSessionCookie(w http.ResponseWriter) {
 		Value:    "",
 		Path:     "/",
 		HttpOnly: true,
+		Secure:   a.secureCookies,
 		SameSite: http.SameSiteStrictMode,
 		MaxAge:   -1,
 	})

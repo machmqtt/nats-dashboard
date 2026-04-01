@@ -3,6 +3,7 @@ package store
 import (
 	"database/sql"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"time"
@@ -17,13 +18,14 @@ const (
 )
 
 type User struct {
-	ID             int64      `json:"id"`
-	Username       string     `json:"username"`
-	Role           string     `json:"role"`
-	CreatedAt      time.Time  `json:"created_at"`
-	LastLogin      *time.Time `json:"last_login,omitempty"`
-	FailedAttempts int        `json:"failed_attempts"`
-	LastFailedAt   *time.Time `json:"last_failed_at,omitempty"`
+	ID                 int64      `json:"id"`
+	Username           string     `json:"username"`
+	Role               string     `json:"role"`
+	CreatedAt          time.Time  `json:"created_at"`
+	LastLogin          *time.Time `json:"last_login,omitempty"`
+	FailedAttempts     int        `json:"failed_attempts"`
+	LastFailedAt       *time.Time `json:"last_failed_at,omitempty"`
+	MustChangePassword bool       `json:"must_change_password"`
 }
 
 type Store struct {
@@ -75,7 +77,8 @@ func (s *Store) migrate() error {
 			created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
 			last_login DATETIME,
 			failed_attempts INTEGER NOT NULL DEFAULT 0,
-			last_failed_at DATETIME
+			last_failed_at DATETIME,
+			must_change_password INTEGER NOT NULL DEFAULT 0
 		)
 	`)
 	if err != nil {
@@ -87,6 +90,7 @@ func (s *Store) migrate() error {
 	s.db.Exec(`ALTER TABLE users ADD COLUMN last_login DATETIME`)
 	s.db.Exec(`ALTER TABLE users ADD COLUMN failed_attempts INTEGER NOT NULL DEFAULT 0`)
 	s.db.Exec(`ALTER TABLE users ADD COLUMN last_failed_at DATETIME`)
+	s.db.Exec(`ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0`)
 
 	// MQTT bridge discovery persistence.
 	_, err = s.db.Exec(`
@@ -238,9 +242,9 @@ func (s *Store) Authenticate(username, password string) (*User, error) {
 	var hash string
 	var lastLogin, lastFailed sql.NullTime
 	err := s.db.QueryRow(
-		"SELECT id, username, password_hash, role, created_at, last_login, failed_attempts, last_failed_at FROM users WHERE username = ?",
+		"SELECT id, username, password_hash, role, created_at, last_login, failed_attempts, last_failed_at, must_change_password FROM users WHERE username = ?",
 		username,
-	).Scan(&u.ID, &u.Username, &hash, &u.Role, &u.CreatedAt, &lastLogin, &u.FailedAttempts, &lastFailed)
+	).Scan(&u.ID, &u.Username, &hash, &u.Role, &u.CreatedAt, &lastLogin, &u.FailedAttempts, &lastFailed, &u.MustChangePassword)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, fmt.Errorf("invalid credentials")
@@ -251,13 +255,17 @@ func (s *Store) Authenticate(username, password string) (*User, error) {
 	if err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password)); err != nil {
 		// Record failed attempt.
 		now := time.Now()
-		s.db.Exec("UPDATE users SET failed_attempts = failed_attempts + 1, last_failed_at = ? WHERE id = ?", now, u.ID)
+		if _, err := s.db.Exec("UPDATE users SET failed_attempts = failed_attempts + 1, last_failed_at = ? WHERE id = ?", now, u.ID); err != nil {
+			slog.Warn("failed to record login attempt", "user", u.Username, "err", err)
+		}
 		return nil, fmt.Errorf("invalid credentials")
 	}
 
 	// Successful login: update last_login, reset failed attempts.
 	now := time.Now()
-	s.db.Exec("UPDATE users SET last_login = ?, failed_attempts = 0 WHERE id = ?", now, u.ID)
+	if _, err := s.db.Exec("UPDATE users SET last_login = ?, failed_attempts = 0 WHERE id = ?", now, u.ID); err != nil {
+		slog.Warn("failed to update login timestamp", "user", u.Username, "err", err)
+	}
 	u.LastLogin = &now
 	u.FailedAttempts = 0
 	if lastLogin.Valid {
@@ -284,7 +292,7 @@ func (s *Store) ChangePassword(userID int64, oldPassword, newPassword string) er
 		return fmt.Errorf("hash password: %w", err)
 	}
 
-	_, err = s.db.Exec("UPDATE users SET password_hash = ? WHERE id = ?", string(newHash), userID)
+	_, err = s.db.Exec("UPDATE users SET password_hash = ?, must_change_password = 0 WHERE id = ?", string(newHash), userID)
 	return err
 }
 
@@ -292,8 +300,8 @@ func (s *Store) GetUser(id int64) (*User, error) {
 	var u User
 	var lastLogin, lastFailed sql.NullTime
 	err := s.db.QueryRow(
-		"SELECT id, username, role, created_at, last_login, failed_attempts, last_failed_at FROM users WHERE id = ?", id,
-	).Scan(&u.ID, &u.Username, &u.Role, &u.CreatedAt, &lastLogin, &u.FailedAttempts, &lastFailed)
+		"SELECT id, username, role, created_at, last_login, failed_attempts, last_failed_at, must_change_password FROM users WHERE id = ?", id,
+	).Scan(&u.ID, &u.Username, &u.Role, &u.CreatedAt, &lastLogin, &u.FailedAttempts, &lastFailed, &u.MustChangePassword)
 	if err != nil {
 		return nil, err
 	}
@@ -307,7 +315,7 @@ func (s *Store) GetUser(id int64) (*User, error) {
 }
 
 func (s *Store) ListUsers() ([]User, error) {
-	rows, err := s.db.Query("SELECT id, username, role, created_at, last_login, failed_attempts, last_failed_at FROM users ORDER BY id")
+	rows, err := s.db.Query("SELECT id, username, role, created_at, last_login, failed_attempts, last_failed_at, must_change_password FROM users ORDER BY id")
 	if err != nil {
 		return nil, err
 	}
@@ -317,7 +325,7 @@ func (s *Store) ListUsers() ([]User, error) {
 	for rows.Next() {
 		var u User
 		var lastLogin, lastFailed sql.NullTime
-		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedAt, &lastLogin, &u.FailedAttempts, &lastFailed); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Role, &u.CreatedAt, &lastLogin, &u.FailedAttempts, &lastFailed, &u.MustChangePassword); err != nil {
 			return nil, err
 		}
 		if lastLogin.Valid {
@@ -354,6 +362,8 @@ func (s *Store) DeleteUser(id int64) error {
 }
 
 // EnsureDefaultAdmin creates the admin/admin user if no users exist.
+// The default user is flagged with must_change_password so the UI
+// forces a password change on first login.
 func (s *Store) EnsureDefaultAdmin() (*User, error) {
 	count, err := s.UserCount()
 	if err != nil {
@@ -362,7 +372,16 @@ func (s *Store) EnsureDefaultAdmin() (*User, error) {
 	if count > 0 {
 		return nil, nil
 	}
-	return s.CreateUser("admin", "admin", RoleAdmin)
+	u, err := s.CreateUser("admin", "admin", RoleAdmin)
+	if err != nil {
+		return nil, err
+	}
+	_, err = s.db.Exec("UPDATE users SET must_change_password = 1 WHERE id = ?", u.ID)
+	if err != nil {
+		return nil, err
+	}
+	u.MustChangePassword = true
+	return u, nil
 }
 
 // MQTTBridgeRecord is a persisted discovered bridge.

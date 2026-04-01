@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 import { useStore } from '../store/store'
 import { CardSkeleton, TableSkeleton } from '../components/Skeleton'
 import { Link } from 'react-router-dom'
@@ -45,6 +46,8 @@ interface MQTTMetrics {
   connections_active: number
   connections_total: number
   connections_rejected: number
+  ws_connections_active?: number
+  ws_connections_total?: number
   auth_success: number
   auth_failure: number
   msgs_recv_qos0: number
@@ -56,6 +59,8 @@ interface MQTTMetrics {
   subscribes: number
   unsubscribes: number
   keepalive_timeouts: number
+  pool_publishes?: number
+  pool_subscribes?: number
   nats_disconnects: number
   nats_reconnects: number
 }
@@ -106,7 +111,7 @@ export function MQTTOverviewPage() {
     if (!activeEnv) return
     setLoading(true)
     try {
-      const res = await fetch(`/api/environments/${activeEnv}/mqtt/bridges`)
+      const res = await fetchWithTimeout(`/api/environments/${activeEnv}/mqtt/bridges`)
       if (res.ok) {
         const data = await res.json()
         setBridges(data.bridges || [])
@@ -259,14 +264,14 @@ export function MQTTOverviewPage() {
                   <>
                     <DI label="Total Accepted" value={fmtNum(s.metrics.connections_total)} />
                     <DI label="Rejected" value={fmtNum(s.metrics.connections_rejected)} />
-                    <DI label="WS Active" value={fmtNum(s.metrics.ws_connections_active)} />
-                    <DI label="WS Total" value={fmtNum(s.metrics.ws_connections_total)} />
+                    <DI label="WS Active" value={fmtNum(s.metrics.ws_connections_active ?? 0)} />
+                    <DI label="WS Total" value={fmtNum(s.metrics.ws_connections_total ?? 0)} />
                     <DI label="Auth OK / Fail" value={`${fmtNum(s.metrics.auth_success)} / ${fmtNum(s.metrics.auth_failure)}`} />
                     <DI label="Recv QoS 0/1/2" value={`${fmtNum(s.metrics.msgs_recv_qos0)} / ${fmtNum(s.metrics.msgs_recv_qos1)} / ${fmtNum(s.metrics.msgs_recv_qos2)}`} />
                     <DI label="Sent QoS 0/1/2" value={`${fmtNum(s.metrics.msgs_sent_qos0)} / ${fmtNum(s.metrics.msgs_sent_qos1)} / ${fmtNum(s.metrics.msgs_sent_qos2)}`} />
                     <DI label="Sub / Unsub" value={`${fmtNum(s.metrics.subscribes)} / ${fmtNum(s.metrics.unsubscribes)}`} />
                     <DI label="Keepalive Timeouts" value={fmtNum(s.metrics.keepalive_timeouts)} />
-                    <DI label="Pool Pub / Sub" value={`${fmtNum(s.metrics.pool_publishes)} / ${fmtNum(s.metrics.pool_subscribes)}`} />
+                    <DI label="Pool Pub / Sub" value={`${fmtNum(s.metrics.pool_publishes ?? 0)} / ${fmtNum(s.metrics.pool_subscribes ?? 0)}`} />
                     <DI label="NATS Disconn / Reconn" value={`${fmtNum(s.metrics.nats_disconnects)} / ${fmtNum(s.metrics.nats_reconnects)}`} />
                   </>
                 )}

@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import {
   LineChart,
   Line,
@@ -27,7 +28,7 @@ function formatTime(ts: number): string {
   return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-export function TimeSeriesChart({ data, lines, yFormatter, height = 200 }: Props) {
+export const TimeSeriesChart = memo(function TimeSeriesChart({ data, lines, yFormatter, height = 200 }: Props) {
   if (!data || data.length === 0) {
     return (
       <div className="flex items-center justify-center text-gray-400 text-sm" style={{ height }}>
@@ -85,4 +86,4 @@ export function TimeSeriesChart({ data, lines, yFormatter, height = 200 }: Props
       </LineChart>
     </ResponsiveContainer>
   )
-}
+})

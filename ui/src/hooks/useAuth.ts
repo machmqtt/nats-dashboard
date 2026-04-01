@@ -4,6 +4,7 @@ export interface User {
   id: number
   username: string
   role: 'admin' | 'viewer'
+  must_change_password: boolean
 }
 
 export function useAuth() {

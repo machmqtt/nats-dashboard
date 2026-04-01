@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useParams, Link } from 'react-router-dom'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 import { useStore } from '../store/store'
 import { CardSkeleton } from '../components/Skeleton'
 import { ArrowLeft } from 'lucide-react'
@@ -44,8 +45,8 @@ export function ServerDetailPage() {
     const run = async () => {
       setLoading(true)
       try {
-        const r = await fetch(`/api/environments/${activeEnv}/varz`)
-        setData(await r.json())
+        const r = await fetchWithTimeout(`/api/environments/${activeEnv}/varz`)
+        if (r.ok) setData(await r.json())
       } catch { /* */ }
       setLoading(false)
     }

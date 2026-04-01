@@ -219,6 +219,10 @@ func TestEnsureDefaultAdmin(t *testing.T) {
 		t.Error("expected nil on second call (users already exist)")
 	}
 
+	if !u.MustChangePassword {
+		t.Error("EnsureDefaultAdmin: expected MustChangePassword=true")
+	}
+
 	// Verify we can authenticate with admin/admin.
 	authed, err := s.Authenticate("admin", "admin")
 	if err != nil {
@@ -226,5 +230,26 @@ func TestEnsureDefaultAdmin(t *testing.T) {
 	}
 	if authed.Role != RoleAdmin {
 		t.Errorf("role = %q, want admin", authed.Role)
+	}
+	if !authed.MustChangePassword {
+		t.Error("Authenticate: expected MustChangePassword=true for default admin")
+	}
+
+	// Verify GetUser also returns the flag.
+	got, err := s.GetUser(authed.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !got.MustChangePassword {
+		t.Error("GetUser: expected MustChangePassword=true for default admin")
+	}
+
+	// After changing password, flag should be cleared.
+	if err := s.ChangePassword(authed.ID, "admin", "newsecret"); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = s.GetUser(authed.ID)
+	if got.MustChangePassword {
+		t.Error("expected MustChangePassword=false after password change")
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -20,8 +21,14 @@ type MQTTBridgeFetcher struct {
 }
 
 func NewMQTTBridgeFetcher(baseURL, name, bearerToken string) *MQTTBridgeFetcher {
+	transport := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 10,
+		IdleConnTimeout:     30 * time.Second,
+		TLSHandshakeTimeout: 5 * time.Second,
+	}
 	return &MQTTBridgeFetcher{
-		client:      &http.Client{},
+		client:      &http.Client{Transport: transport, Timeout: 10 * time.Second},
 		baseURL:     baseURL,
 		name:        name,
 		bearerToken: bearerToken,
@@ -66,7 +73,7 @@ func (f *MQTTBridgeFetcher) FetchConnz(ctx context.Context, limit, offset int) (
 }
 
 func (f *MQTTBridgeFetcher) FetchConnzClient(ctx context.Context, clientID string) (*MQTTConnz, error) {
-	path := "/connz?mqtt_client=" + clientID
+	path := "/connz?mqtt_client=" + url.QueryEscape(clientID)
 	var c MQTTConnz
 	return &c, f.fetch(ctx, path, &c)
 }

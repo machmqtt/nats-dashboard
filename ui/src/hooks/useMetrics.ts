@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 
 export type TimeRange = '1h' | '6h' | '24h'
 
@@ -42,7 +43,7 @@ export function useMetrics(
     }
 
     try {
-      const res = await fetch(`/api/environments/${env}/${endpoint}?${search}`)
+      const res = await fetchWithTimeout(`/api/environments/${env}/${endpoint}?${search}`)
       if (res.ok) {
         const json = await res.json()
         setData(json.points || [])

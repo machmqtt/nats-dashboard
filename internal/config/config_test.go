@@ -12,7 +12,7 @@ func TestLoadValid(t *testing.T) {
 	os.WriteFile(p, []byte(`
 listen: ":9090"
 poll_interval: 10s
-session_secret: "test-secret"
+session_secret: "test-secret-that-is-at-least-32-characters-long"
 data_dir: "./testdata"
 environments:
   - name: dev
@@ -58,7 +58,7 @@ func TestLoadNoEnvironments(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.yaml")
 	os.WriteFile(p, []byte(`
-session_secret: "test"
+session_secret: "test-secret-that-is-at-least-32-characters-long"
 `), 0o644)
 
 	_, err := Load(p)
@@ -71,7 +71,7 @@ func TestLoadDefaults(t *testing.T) {
 	dir := t.TempDir()
 	p := filepath.Join(dir, "config.yaml")
 	os.WriteFile(p, []byte(`
-session_secret: "test"
+session_secret: "test-secret-that-is-at-least-32-characters-long"
 environments:
   - name: dev
     servers:

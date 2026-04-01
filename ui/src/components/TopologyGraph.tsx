@@ -34,8 +34,8 @@ function fmtRate(r: number): string {
 }
 
 function structureKey(data: TGraph): string {
-  const nk = data.nodes.map((n) => n.id).sort().join(',')
-  const lk = data.links.map((l) => `${l.source}>${l.target}`).sort().join(',')
+  const nk = (data.nodes || []).map((n) => n.id).sort().join(',')
+  const lk = (data.links || []).map((l) => `${l.source}>${l.target}`).sort().join(',')
   return nk + '|' + lk
 }
 
@@ -158,7 +158,7 @@ function computeLayout(
 }
 
 export function TopologyGraphView({ data }: Props) {
-  const fgRef = useRef<ForceGraphMethods | undefined>()
+  const fgRef = useRef<ForceGraphMethods | undefined>(undefined)
   const [selectedNode, setSelectedNode] = useState<TopologyNode | null>(null)
   const [selectedLink, setSelectedLink] = useState<TopologyLink | null>(null)
   const darkMode = useStore((s) => s.darkMode)
@@ -205,8 +205,8 @@ export function TopologyGraphView({ data }: Props) {
   const curKey = structureKey(data)
 
   // Update metrics refs (always, even during drag — these don't affect layout).
-  for (const n of data.nodes) metricsRef.current.set(n.id, n)
-  for (const l of data.links) linkMetricsRef.current.set(`${l.source}>${l.target}`, l)
+  for (const n of data.nodes || []) metricsRef.current.set(n.id, n)
+  for (const l of data.links || []) linkMetricsRef.current.set(`${l.source}>${l.target}`, l)
 
   if (selectedLink) {
     const key = `${selectedLink.source}>${selectedLink.target}`
@@ -229,12 +229,14 @@ export function TopologyGraphView({ data }: Props) {
     if (!ready) return { nodes: [], links: [] }
 
     const d = dataRef.current
-    const layout = computeLayout(d.nodes, d.links, positionsRef.current)
+    const dNodes = d.nodes || []
+    const dLinks = d.links || []
+    const layout = computeLayout(dNodes, dLinks, positionsRef.current)
     const saved: PositionMap = {}
     for (const [id, p] of layout) saved[id] = p
     positionsRef.current = saved
 
-    const nodes = d.nodes.map((n) => {
+    const nodes = dNodes.map((n) => {
       const p = layout.get(n.id) || { x: 0, y: 0 }
       return {
         id: n.id, name: n.name, type: n.type,
@@ -245,7 +247,7 @@ export function TopologyGraphView({ data }: Props) {
       }
     })
 
-    const links = d.links.map((l) => ({
+    const links = dLinks.map((l) => ({
       source: l.source, target: l.target, type: l.type,
       in_msgs_rate: l.in_msgs_rate, out_msgs_rate: l.out_msgs_rate,
     }))

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
+import { fetchWithTimeout } from '../utils/fetchWithTimeout'
 import {
   createColumnHelper,
   flexRender,
@@ -76,7 +77,7 @@ export function ConnectionsPage() {
       if (state) params.set('state', state)
       if (filterSubject) params.set('filter_subject', filterSubject)
 
-      const res = await fetch(`/api/environments/${activeEnv}/connz?${params}`)
+      const res = await fetchWithTimeout(`/api/environments/${activeEnv}/connz?${params}`)
       if (res.ok) {
         setData(await res.json())
       } else if (isInitial) {
@@ -107,7 +108,7 @@ export function ConnectionsPage() {
     setSelected(conn)
     setDetailLoading(true)
     try {
-      const res = await fetch(`/api/environments/${activeEnv}/connz/${conn.cid}`)
+      const res = await fetchWithTimeout(`/api/environments/${activeEnv}/connz/${conn.cid}`)
       if (res.ok) {
         const detail = await res.json()
         setSelected(detail)
